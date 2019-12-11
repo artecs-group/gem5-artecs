@@ -167,6 +167,10 @@ class L2XBar(CoherentXBar):
     # to the first level of unified cache.
     point_of_unification = True
 
+# Coherent crossbar to connect L2 caches to the L3, if any
+class L3XBar(L2XBar):
+    point_of_unification = False
+
 # One of the key coherent crossbar instances is the system
 # interconnect, tying together the CPU clusters, GPUs, and any I/O
 # coherent requestors, and DRAM controllers.

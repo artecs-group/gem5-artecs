@@ -128,10 +128,11 @@ def config_cache(options, system):
             print("O3_ARM_v7a_3 is unavailable. Did you compile the O3 model?")
             sys.exit(1)
 
-        dcache_class, icache_class, l2_cache_class, walk_cache_class = \
+        dcache_class, icache_class, l2_cache_class, walk_cache_class, \
+            l3_cache_class = \
             core.O3_ARM_v7a_DCache, core.O3_ARM_v7a_ICache, \
             core.O3_ARM_v7aL2, \
-            None
+            None, None
     elif options.cpu_type == "HPI":
         try:
             import cores.arm.HPI as core
@@ -139,11 +140,14 @@ def config_cache(options, system):
             print("HPI is unavailable.")
             sys.exit(1)
 
-        dcache_class, icache_class, l2_cache_class, walk_cache_class = \
-            core.HPI_DCache, core.HPI_ICache, core.HPI_L2, None
+        dcache_class, icache_class, l2_cache_class, walk_cache_class, \
+            l3_cache_class = \
+            core.HPI_DCache, core.HPI_ICache, core.HPI_L2, \
+            None, None
     else:
-        dcache_class, icache_class, l2_cache_class, walk_cache_class = \
-            L1_DCache, L1_ICache, L2Cache, None
+        dcache_class, icache_class, l2_cache_class, walk_cache_class, \
+            l3_cache_class = \
+            L1_DCache, L1_ICache, L2Cache, None, L3Cache
 
         if buildEnv['TARGET_ISA'] in ['x86', 'riscv']:
             walk_cache_class = PageTableWalkerCache
@@ -168,6 +172,25 @@ def config_cache(options, system):
         system.tol2bus = L2XBar(clk_domain = system.cpu_clk_domain)
         system.l2.cpu_side = system.tol2bus.mem_side_ports
         system.l2.mem_side = system.membus.cpu_side_ports
+
+    if options.l3cache:
+        if not options.l2cache:
+            fatal("It is not possible to have a L3 cache without a L2.")
+
+        if l3_cache_class == None:
+            fatal("No valid L3 configuration found.")
+
+        system.l3 = l3_cache_class(clk_domain=system.cpu_clk_domain,
+                                   **_get_cache_opts('l3', options))
+
+        system.tol3bus = L3XBar(clk_domain = system.cpu_clk_domain)
+        system.l2.mem_side = system.tol3bus.cpu_side_ports
+        system.l3.cpu_side = system.tol3bus.mem_side_ports
+        system.l3.mem_side = system.membus.cpu_side_ports
+
+        # Change some stuff in L2 since it is not the LLC anymore
+        system.l2.clusivity = 'mostly_incl'
+        system.l2.prefetch_on_access = False
 
     if options.memchecker:
         system.memchecker = MemChecker()
