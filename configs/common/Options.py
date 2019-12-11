@@ -141,6 +141,7 @@ def addNoISAOptions(parser):
                         help="use external port for SystemC TLM cosimulation")
     parser.add_argument("--caches", action="store_true")
     parser.add_argument("--l2cache", action="store_true")
+    parser.add_argument("--l3cache", action="store_true")
     parser.add_argument("--num-dirs", type=int, default=1)
     parser.add_argument("--num-l2caches", type=int, default=1)
     parser.add_argument("--num-l3caches", type=int, default=1)
@@ -160,42 +161,56 @@ def addNoISAOptions(parser):
                          help="L1D tag lookup latency (cycles)")
     parser.add_argument("--l2-tag-lat", type=int, default="20",
                          help="L2 tag lookup latency (cycles)")
+    parser.add_argument("--l3-tag-lat", type=int, default="40",
+                         help="L3 tag lookup latency (cycles)")
     parser.add_argument("--l1i-data-lat", type=int, default="2",
                          help="L1I hit latency (cycles)")
     parser.add_argument("--l1d-data-lat", type=int, default="2",
                          help="L1D hit latency (cycles)")
     parser.add_argument("--l2-data-lat", type=int, default="20",
                          help="L2 hit latency (cycles)")
+    parser.add_argument("--l3-data-lat", type=int, default="40",
+                         help="L3 hit latency (cycles)")
     parser.add_argument("--l1i-write-lat", type=int, default="2",
                          help="L1I write latency (cycles)")
     parser.add_argument("--l1d-write-lat", type=int, default="2",
                          help="L1D write latency (cycles)")
     parser.add_argument("--l2-write-lat", type=int, default="20",
                          help="L2 write latency (cycles)")
+    parser.add_argument("--l3-write-lat", type=int, default="40",
+                         help="L3 write latency (cycles)")
     parser.add_argument("--l1i-resp-lat", type=int, default="2",
                          help="L1I response latency (cycles)")
     parser.add_argument("--l1d-resp-lat", type=int, default="2",
                          help="L1D response latency (cycles)")
     parser.add_argument("--l2-resp-lat", type=int, default="20",
                          help="L2 response latency (cycles)")
+    parser.add_argument("--l3-resp-lat", type=int, default="40",
+                         help="L3 write latency (cycles)")
     parser.add_argument("--l1i-enable-banks", action="store_true",
                          help="Enable L1I bank model")
     parser.add_argument("--l1d-enable-banks", action="store_true",
                          help="Enable L1D bank model")
     parser.add_argument("--l2-enable-banks", action="store_true",
                          help="Enable L2 bank model")
+    parser.add_argument("--l3-enable-banks", action="store_true",
+                         help="Enable L3 bank model")
     parser.add_argument("--l1i-num-banks", type=int, default="4",
                          help="Number of L1I cache banks")
     parser.add_argument("--l1d-num-banks", type=int, default="4",
                          help="Number of L1D cache banks")
     parser.add_argument("--l2-num-banks", type=int, default="4",
                          help="Number of L2 banks")
+    parser.add_argument("--l3-num-banks", type=int, default="4",
+                         help="Number of L3 banks")
     parser.add_argument("--l1i-intlv-bit", type=int, default="0",
                          help="L1I bank interleave highest bit")
     parser.add_argument("--l1d-intlv-bit", type=int, default="0",
                          help="L1D bank interleave highest bit")
     parser.add_argument("--l2-intlv-bit", type=int, default="0",
                          help="L2 bank interleave highest bit")
+    parser.add_argument("--l3-intlv-bit", type=int, default="0",
+                         help="L3 bank interleave highest bit")
 
     # Enable Ruby
     parser.add_argument("--ruby", action="store_true")
@@ -279,24 +294,36 @@ def addCommonOptions(parser):
                         type of hardware prefetcher to use with the L2 cache.
                         (if not set, use the default prefetcher of
                         the selected cache)""")
+    parser.add_argument("--l3-hwp-type", default=None,
+                        choices=ObjectList.hwp_list.get_names(),
+                        help="""
+                        type of hardware prefetcher to use with the L3 cache.
+                        (if not set, use the default prefetcher of
+                        the selected cache)""")
     parser.add_argument("--l1i-hwp-deg", type=int, default="0",
                         help="L1I prefetcher degree")
     parser.add_argument("--l1d-hwp-deg", type=int, default="0",
                         help="L1D prefetcher degree")
     parser.add_argument("--l2-hwp-deg", type=int, default="0",
                         help="L2 prefetcher degree")
+    parser.add_argument("--l3-hwp-deg", type=int, default="0",
+                        help="L3 prefetcher degree")
     parser.add_argument("--l1i-hwp-lat", type=int, default="0",
                         help="L1I prefetcher latency")
     parser.add_argument("--l1d-hwp-lat", type=int, default="0",
                         help="L1D prefetcher latency")
     parser.add_argument("--l2-hwp-lat", type=int, default="0",
                         help="L2 prefetcher latency")
+    parser.add_argument("--l3-hwp-lat", type=int, default="0",
+                        help="L3 prefetcher latency")
     parser.add_argument("--l1i-hwp-qs", type=int, default="0",
                         help="L1I prefetcher queue size")
     parser.add_argument("--l1d-hwp-qs", type=int, default="0",
                         help="L1D prefetcher queue size")
     parser.add_argument("--l2-hwp-qs", type=int, default="0",
                         help="L2 prefetcher queue size")
+    parser.add_argument("--l3-hwp-qs", type=int, default="0",
+                        help="L3 prefetcher queue size")
     parser.add_argument("--checker", action="store_true")
     parser.add_argument("--cpu-clock", action="store", type=str,
                         default='2GHz',
