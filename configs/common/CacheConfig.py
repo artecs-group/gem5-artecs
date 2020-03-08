@@ -162,16 +162,24 @@ def config_cache(options, system):
     if options.l2cache and options.elastic_trace_en:
         fatal("When elastic trace is enabled, do not configure L2 caches.")
 
+    num_l2caches = options.num_l2caches
+
     if options.l2cache:
+        if options.num_cpus % num_l2caches != 0:
+            fatal("The number of L2 caches must be a submultiple of the ",
+                  "number of cores.")
         # Provide a clock for the L2 and the L1-to-L2 bus here as they
         # are not connected using addTwoLevelCacheHierarchy. Use the
         # same clock as the CPUs.
-        system.l2 = l2_cache_class(clk_domain=system.cpu_clk_domain,
-                                   **_get_cache_opts('l2', options))
+        system.l2 = [l2_cache_class(clk_domain=system.cpu_clk_domain,
+            **_get_cache_opts('l2', options)) for i in range(num_l2caches)]
+        system.tol2bus = [L2XBar(clk_domain = system.cpu_clk_domain)
+            for i in range(num_l2caches)]
 
-        system.tol2bus = L2XBar(clk_domain = system.cpu_clk_domain)
-        system.l2.cpu_side = system.tol2bus.mem_side_ports
-        system.l2.mem_side = system.membus.cpu_side_ports
+        for i in range(num_l2caches):
+            system.l2[i].cpu_side = system.tol2bus[i].mem_side_ports
+            if not options.l3cache:
+                system.l2[i].mem_side = system.membus.cpu_side_ports
 
     if options.l3cache:
         if not options.l2cache:
@@ -184,13 +192,14 @@ def config_cache(options, system):
                                    **_get_cache_opts('l3', options))
 
         system.tol3bus = L3XBar(clk_domain = system.cpu_clk_domain)
-        system.l2.mem_side = system.tol3bus.cpu_side_ports
         system.l3.cpu_side = system.tol3bus.mem_side_ports
         system.l3.mem_side = system.membus.cpu_side_ports
 
         # Change some stuff in L2 since it is not the LLC anymore
-        system.l2.clusivity = 'mostly_incl'
-        system.l2.prefetch_on_access = False
+        for i in range(num_l2caches):
+            system.l2[i].clusivity = 'mostly_incl'
+            system.l2[i].prefetch_on_access = False
+            system.l2[i].mem_side = system.tol3bus.cpu_side_ports
 
     if options.memchecker:
         system.memchecker = MemChecker()
@@ -254,8 +263,9 @@ def config_cache(options, system):
 
         system.cpu[i].createInterruptController()
         if options.l2cache:
+            bus = i % num_l2caches
             system.cpu[i].connectAllPorts(
-                system.tol2bus.cpu_side_ports,
+                system.tol2bus[bus].cpu_side_ports,
                 system.membus.cpu_side_ports, system.membus.mem_side_ports)
         elif options.external_memory_system:
             system.cpu[i].connectUncachedPorts(
