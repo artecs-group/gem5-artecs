@@ -163,8 +163,8 @@ main = Environment(tools=[
         ConfigFile, AddLocalRPATH, SwitchingHeaders, TagImpliesTool, Blob
     ])
 
-main.Tool(SCons.Tool.FindTool(['gcc', 'clang'], main))
-main.Tool(SCons.Tool.FindTool(['g++', 'clang++'], main))
+main.Tool(SCons.Tool.FindTool(['conda_gcc', 'gcc', 'clang'], main))
+main.Tool(SCons.Tool.FindTool(['conda_gxx', 'g++', 'clang++'], main))
 
 Export('main')
 
@@ -292,6 +292,9 @@ else:
 Export('base_dir')
 Export('extras_dir_list')
 
+main.Append(CPPPATH=environ.get('CPPPATH', ''))
+main.Append(LIBPATH=environ.get('LIBPATH', ''))
+
 # the ext directory should be on the #includes path
 main.Append(CPPPATH=[Dir('ext')])
 
@@ -318,7 +321,8 @@ main['TCMALLOC_CCFLAGS'] = []
 
 CXX_version = readCommand([main['CXX'], '--version'], exception=False)
 
-main['GCC'] = CXX_version and CXX_version.find('g++') >= 0
+main['GCC'] = CXX_version and (CXX_version.find('g++') >= 0 or
+                               CXX_version.find('gnu-c++') >= 0)
 main['CLANG'] = CXX_version and CXX_version.find('clang') >= 0
 if main['GCC'] + main['CLANG'] > 1:
     error('Two compilers enabled at once?')
