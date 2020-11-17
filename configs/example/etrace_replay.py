@@ -61,17 +61,15 @@ numThreads = 1
 
 if args.cpu_type != "TraceCPU":
     fatal("This is a script for elastic trace replay simulation, use "\
-            "--cpu-type=TraceCPU\n");
-
-if args.num_cpus > 1:
-    fatal("This script does not support multi-processor trace replay.\n")
+          "--cpu-type=TraceCPU\n")
 
 # In this case FutureClass will be None as there is not fast forwarding or
 # switching
 (CPUClass, test_mem_mode, FutureClass) = Simulation.setCPUClass(args)
 CPUClass.numThreads = numThreads
 
-system = System(cpu = CPUClass(cpu_id=0),
+np = args.num_cpus
+system = System(cpu = [CPUClass(cpu_id=i) for i in range(np)],
                 mem_mode = test_mem_mode,
                 mem_ranges = [AddrRange(args.mem_size)],
                 cache_line_size = args.cacheline_size)
@@ -98,14 +96,17 @@ system.cpu_clk_domain = SrcClockDomain(clock = args.cpu_clock,
 for cpu in system.cpu:
     cpu.clk_domain = system.cpu_clk_domain
 
-# BaseCPU no longer has default values for the BaseCPU.isa
-# createThreads() is needed to fill in the cpu.isa
-for cpu in system.cpu:
-    cpu.createThreads()
+inst_trace_file = args.inst_trace_file.split(';')
+data_trace_file = args.data_trace_file.split(';')
+assert len(inst_trace_file) == np and len(data_trace_file) == np
+for i in range(np):
+    # BaseCPU no longer has default values for the BaseCPU.isa
+    # createThreads() is needed to fill in the cpu.isa
+    system.cpu[i].createThreads()
 
-# Assign input trace files to the Trace CPU
-system.cpu.instTraceFile=args.inst_trace_file
-system.cpu.dataTraceFile=args.data_trace_file
+    # Assign input trace files to the Trace CPU
+    system.cpu[i].instTraceFile = inst_trace_file[i]
+    system.cpu[i].dataTraceFile = data_trace_file[i]
 
 # Configure the classic memory system args
 MemClass = Simulation.setMemClass(args)
