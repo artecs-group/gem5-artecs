@@ -199,6 +199,12 @@ def main():
             num_regdeps += 1 # No. of packets with atleast 1 register dependency
             for dep in packet.reg_dep:
                 ascii_out.write(',%s' % dep)
+
+        # Write to file the virtual addr, if present
+        ascii_out.write(':')
+        if packet.HasField('v_addr'):
+            ascii_out.write('%s' % packet.v_addr)
+
         # New line
         ascii_out.write('\n')
 
