@@ -145,7 +145,7 @@ def main():
     # For each line in the ASCII trace, create a packet message and
     # write it to the encoded output
     for line in ascii_in:
-        inst_info_str, rob_dep_str, reg_dep_str = (line.strip()).split(':')
+        inst_info_str, rob_dep_str, reg_dep_str = (line.strip()).split(':')[:3]
         inst_info_list = inst_info_str.split(',')
         dep_record = DepRecord()
 
