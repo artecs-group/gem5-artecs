@@ -1006,6 +1006,19 @@ CoherentXBar::recvFunctional(PacketPtr pkt, PortID cpu_side_port_id)
                 cpuSidePorts[cpu_side_port_id]->name(), pkt->print());
     }
 
+    if (pkt->cmd == MemCmd::CacheBankQuery)
+    {
+        if (!pointOfCoherency) {
+            // ignore snooping and send directly to the next level
+            memSidePorts[findPort(pkt->getAddrRange())]->sendFunctional(pkt);
+        } else {
+            // this is only relevant for caches. Leave the payload untouched
+            // and transform the packet into a response
+            pkt->makeResponse();
+        }
+        return;
+    }
+
     if (!system->bypassCaches()) {
         // forward to all snoopers but the source
         forwardFunctional(pkt, cpu_side_port_id);

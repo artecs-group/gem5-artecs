@@ -559,6 +559,31 @@ class BaseCache : public ClockedObject
     }
 
     /**
+     * Send a functional packet downstream to check if a request can be
+     * accepted immediately or has to be delayed (the bank is busy)
+     *
+     * @param pkt The packet containing the request
+     * @return The delay to apply to the request
+     */
+    Tick nextLevelBankDelay(PacketPtr pkt)
+    {
+        assert(pkt);
+        typedef std::pair<PacketPtr, Tick> Payload;
+        Payload data(pkt, 0);
+        RequestPtr q_req = std::make_shared<Request>(pkt->getAddr(),
+                                                     sizeof(Payload), 0,
+                                                     Request::funcRequestorId);
+        PacketPtr q_pkt = new Packet(q_req, MemCmd::CacheBankQuery);
+        q_pkt->allocate();
+        q_pkt->setLE<Payload>(data);
+        memSidePort.sendFunctional(q_pkt);
+        data = q_pkt->getLE<Payload>();
+        delete q_pkt;
+
+        return data.second;
+    }
+
+    /**
      * Determine whether we should allocate on a fill or not. If this
      * cache is mostly inclusive with regards to the upstream cache(s)
      * we always allocate (for any non-forwarded and cacheable
@@ -1085,6 +1110,9 @@ class BaseCache : public ClockedObject
     /* Allow lookup tags even if blocked bank */
     const bool unlockedTags;
 
+    /* Avoid sender paralysis on bank conflict */
+    const bool cflDelay;
+
     /* Stores the number of blocked banks */
     unsigned bankBlockedNum;
 
@@ -1573,6 +1601,15 @@ class BaseCache : public ClockedObject
     virtual bool sendMSHRQueuePacket(MSHR* mshr);
 
     /**
+     * Leave an MSHR in its queue for an additional time instead of
+     * sending it out as a downstream packet.
+     *
+     * @param mshr The MSHR to delay
+     * @param delay_ticks The additional time in ticks
+     */
+    virtual void delayMSHRQueuePacket(MSHR* mshr, Tick delay_ticks);
+
+    /**
      * Similar to sendMSHR, but for a write-queue entry
      * instead. Create the packet, and send it, and if successful also
      * mark the entry in service.
@@ -1581,6 +1618,16 @@ class BaseCache : public ClockedObject
      * @return True if the port is waiting for a retry
      */
     bool sendWriteQueuePacket(WriteQueueEntry* wq_entry);
+
+    /**
+     * Similar to delayMSHR, but for a write-queue entry
+     * instead.
+     *
+     * @param wq_entry The write-queue entry to delay
+     * @param delay_ticks The additional time in ticks
+     */
+    virtual void delayWriteQueuePacket(WriteQueueEntry* wq_entry,
+                                       Tick delay_ticks);
 
     /**
      * Serialize the state of the caches

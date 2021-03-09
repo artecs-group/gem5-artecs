@@ -123,6 +123,12 @@ WriteQueueEntry::deallocate()
     inService = false;
 }
 
+void
+WriteQueueEntry::delay(Tick delay_ticks)
+{
+    readyTime = curTick() + delay_ticks;
+}
+
 bool
 WriteQueueEntry::trySatisfyFunctional(PacketPtr pkt)
 {
@@ -141,6 +147,12 @@ bool
 WriteQueueEntry::sendPacket(BaseCache &cache)
 {
     return cache.sendWriteQueuePacket(this);
+}
+
+void
+WriteQueueEntry::delayPacket(BaseCache &cache, Tick delay_ticks)
+{
+    return cache.delayWriteQueuePacket(this, delay_ticks);
 }
 
 bool

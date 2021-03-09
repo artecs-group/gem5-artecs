@@ -60,6 +60,7 @@
 #include "mem/cache/queue_entry.hh"
 #include "mem/cache/tags/compressed_tags.hh"
 #include "mem/cache/tags/super_blk.hh"
+#include "mem/packet_access.hh"
 #include "params/BaseCache.hh"
 #include "params/WriteAllocator.hh"
 #include "sim/core.hh"
@@ -110,6 +111,7 @@ BaseCache::BaseCache(const BaseCacheParams &p, unsigned blk_size)
       bankIntlvLowBit(bankIntlvHighBit + 1 - bankIntlvBits),
       bankIntlvMask(((1ULL << bankIntlvBits) - 1 ) << bankIntlvLowBit),
       unlockedTags(p.unlocked_tags),
+      cflDelay(p.cfl_delay),
       bankBlockedNum(0),
       bankLastEvent(0),
       sequentialAccess(p.sequential_access),
@@ -920,6 +922,26 @@ void
 BaseCache::functionalAccess(PacketPtr pkt, bool from_cpu_side)
 {
     Addr blk_addr = pkt->getBlockAddr(blkSize);
+
+    if (pkt->cmd == MemCmd::CacheBankQuery)
+    {
+        typedef std::pair<PacketPtr, Tick> Payload;
+        Payload data = pkt->getLE<Payload>();
+        if (enableBanks && cflDelay && checkDataArrayAccess(data.first))
+        {
+            unsigned bank_id = getBankId(blk_addr);
+            if (banks[bank_id]->isBusy())
+            {
+                // Set the delay
+                data.second = banks[bank_id]->finishTick() + 1 - curTick();
+                // Rewrite the packet payload
+                pkt->setLE<Payload>(data);
+            }
+        }
+        pkt->makeResponse();
+        return;
+    }
+
     bool is_secure = pkt->isSecure();
     CacheBlk *blk = tags->findBlock(pkt->getAddr(), is_secure);
     MSHR *mshr = mshrQueue.findMatch(blk_addr, is_secure);
@@ -2248,6 +2270,12 @@ BaseCache::sendMSHRQueuePacket(MSHR* mshr)
     }
 }
 
+void
+BaseCache::delayMSHRQueuePacket(MSHR* mshr, Tick delay_ticks)
+{
+    mshrQueue.delay(mshr, delay_ticks);
+}
+
 bool
 BaseCache::sendWriteQueuePacket(WriteQueueEntry* wq_entry)
 {
@@ -2270,6 +2298,12 @@ BaseCache::sendWriteQueuePacket(WriteQueueEntry* wq_entry)
         markInService(wq_entry);
         return false;
     }
+}
+
+void
+BaseCache::delayWriteQueuePacket(WriteQueueEntry* wq_entry, Tick delay_ticks)
+{
+    writeBuffer.delay(wq_entry, delay_ticks);
 }
 
 void
@@ -3187,12 +3221,22 @@ BaseCache::CacheReqPacketQueue::sendDeferredPacket()
         // before the retry, the writeback is eliminated because
         // we snoop another cache's ReadEx.
     } else {
+        PacketPtr pkt = entry->getTarget()->pkt;
+
         // let our snoop responses go first if there are responses to
         // the same addresses
-        if (checkConflictingSnoop(entry->getTarget()->pkt)) {
+        if (checkConflictingSnoop(pkt)) {
             return;
         }
-        waitingOnRetry = entry->sendPacket(cache);
+
+        Tick delay = cache.nextLevelBankDelay(pkt);
+        if (!delay) {
+            waitingOnRetry = entry->sendPacket(cache);
+        } else {
+            DPRINTF(CacheBank, "%s: delaying %s by %lu ticks\n",
+                    __func__, pkt->print(), delay);
+            entry->delayPacket(cache, delay);
+        }
     }
 
     // if we succeeded and are not waiting for a retry, schedule the

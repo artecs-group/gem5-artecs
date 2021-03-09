@@ -136,6 +136,8 @@ class MemCmd
         FlushReq,      //request for a cache flush
         InvalidateReq,   // request for address to be invalidated
         InvalidateResp,
+        CacheBankQuery,  // check if next level cache bank is busy
+        CacheBankTime,   // time to wait for the bank to be available
         // hardware transactional memory
         HTMReq,
         HTMReqResp,

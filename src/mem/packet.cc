@@ -215,6 +215,11 @@ MemCmd::commandInfo[] =
     /* Invalidation Response */
     { {IsInvalidate, IsResponse},
       InvalidCmd, "InvalidateResp" },
+    /* Cache Bank Query */
+    { {IsRequest, NeedsResponse, HasData},
+      CacheBankTime, "CacheBankQuery" },
+    /* Cache Bank Time */
+    { {IsResponse, HasData}, InvalidCmd, "CacheBankTime" },
       // hardware transactional memory
     { {IsRead, IsRequest, NeedsResponse}, HTMReqResp, "HTMReq" },
     { {IsRead, IsResponse}, InvalidCmd, "HTMReqResp" },
@@ -235,6 +240,11 @@ Packet::trySatisfyFunctional(Printable *obj, Addr addr, bool is_secure, int size
     const Addr func_end   = getAddr() + getSize() - 1;
     const Addr val_start  = addr;
     const Addr val_end    = val_start + size - 1;
+
+    // no effect from cache bank query/time packets
+    if (cmd == MemCmd::CacheBankQuery || cmd == MemCmd::CacheBankTime) {
+        return false;
+    }
 
     if (is_secure != _isSecure || func_start > val_end ||
         val_start > func_end) {

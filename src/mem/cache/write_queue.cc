@@ -75,6 +75,17 @@ WriteQueue::allocate(Addr blk_addr, unsigned blk_size, PacketPtr pkt,
 }
 
 void
+WriteQueue::delay(WriteQueueEntry *entry, Tick delay_ticks)
+{
+    entry->delay(delay_ticks);
+    auto it = std::find_if(entry->readyIter, readyList.end(),
+                            [entry] (const WriteQueueEntry* _entry) {
+                                return entry->readyTime >= _entry->readyTime;
+                            });
+    readyList.splice(it, readyList, entry->readyIter);
+}
+
+void
 WriteQueue::markInService(WriteQueueEntry *entry)
 {
     // for a normal eviction, such as a writeback or a clean evict,
