@@ -92,6 +92,7 @@ class BaseCache(ClockedObject):
         "(0 = automatically aligned to cache line granularity)")
     unlocked_tags = Param.Bool(True,
         "Allow to check tags even if the bank is blocked")
+    cfl_delay = Param.Bool(True, "Avoid sender paralysis on bank conflict")
 
     warmup_percentage = Param.Percent(0,
         "Percentage of tags to be touched to warm up the cache")

@@ -93,6 +93,7 @@ class WriteQueueEntry : public QueueEntry, public Printable
     typedef List::iterator Iterator;
 
     bool sendPacket(BaseCache &cache) override;
+    void delayPacket(BaseCache &cache, Tick delay_ticks) override;
 
   private:
 
@@ -134,6 +135,13 @@ class WriteQueueEntry : public QueueEntry, public Printable
      * Mark this entry as free.
      */
     void deallocate();
+
+    /**
+     * Adds a delay relative to the current tick to the
+     * current write queue entry
+     * @param delay_ticks the desired delay in ticks
+     */
+    void delay(Tick delay_ticks);
 
     /**
      * Returns the current number of allocated targets.

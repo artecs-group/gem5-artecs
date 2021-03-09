@@ -505,6 +505,10 @@ AbstractMemory::functionalAccess(PacketPtr pkt)
         prs->printLabels();
         // Right now we just print the single byte at the specified address.
         ccprintf(prs->os, "%s%#x\n", prs->curPrefix(), *host_addr);
+    } else if (pkt->cmd == MemCmd::CacheBankQuery) {
+        // This is only relevant for caches. Leave the payload untouched
+        // and transform the packet into a response
+        pkt->makeResponse();
     } else {
         panic("AbstractMemory: unimplemented functional command %s",
               pkt->cmdString());

@@ -89,6 +89,15 @@ class WriteQueue : public Queue<WriteQueueEntry>
                               PacketPtr pkt, Tick when_ready, Counter order);
 
     /**
+     * Adds a delay to the provided write queue entry and moves entries
+     * that will be ready earlier than this entry to the top of the list
+     *
+     * @param entry that needs to be delayed
+     * @param delay_ticks ticks of the desired delay
+     */
+    void delay(WriteQueueEntry *entry, Tick delay_ticks);
+
+    /**
      * Mark the given entry as in service. This removes the entry from
      * the readyList or deallocates the entry if it does not expect a
      * response (writeback/eviction rather than an uncacheable write).

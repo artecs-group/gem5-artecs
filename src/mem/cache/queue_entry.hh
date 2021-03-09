@@ -163,6 +163,12 @@ class QueueEntry : public Packet::SenderState, public Named
     virtual bool sendPacket(BaseCache &cache) = 0;
 
     /**
+     * Delay the provided entry by a specified time, with the exact
+     * behaviour depending on the specific entry type.
+     */
+    virtual void delayPacket(BaseCache &cache, Tick delay_ticks) = 0;
+
+    /**
      * Returns a pointer to the first target.
      *
      * @return A pointer to the first target.

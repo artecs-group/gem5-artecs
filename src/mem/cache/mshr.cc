@@ -709,6 +709,12 @@ MSHR::sendPacket(BaseCache &cache)
 }
 
 void
+MSHR::delayPacket(BaseCache &cache, Tick delay_ticks)
+{
+    return cache.delayMSHRQueuePacket(this, delay_ticks);
+}
+
+void
 MSHR::print(std::ostream &os, int verbosity, const std::string &prefix) const
 {
     ccprintf(os, "%s[%#llx:%#llx](%s) %s %s %s state: %s %s %s %s %s %s\n",

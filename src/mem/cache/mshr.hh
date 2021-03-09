@@ -336,6 +336,7 @@ class MSHR : public QueueEntry, public Printable
     }
 
     bool sendPacket(BaseCache &cache) override;
+    void delayPacket(BaseCache &cache, Tick delay_ticks) override;
 
     bool allocOnFill() const {
         return targets.allocOnFill;
@@ -499,7 +500,6 @@ class MSHR : public QueueEntry, public Printable
      */
     void delay(Tick delay_ticks)
     {
-        assert(readyTime <= curTick());
         readyTime = curTick() + delay_ticks;
     }
 
