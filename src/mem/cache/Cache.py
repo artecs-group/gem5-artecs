@@ -81,7 +81,17 @@ class BaseCache(ClockedObject):
 
     tag_latency = Param.Cycles("Tag lookup latency")
     data_latency = Param.Cycles("Data access latency")
-    response_latency = Param.Cycles("Latency for the return path on a miss");
+    write_latency = Param.Cycles(0, "Data write latency")
+    response_latency = Param.Cycles("Latency for the return path on a miss")
+
+    enable_banks = Param.Bool(False,
+        "Knob to control if the bank model is used")
+    num_banks = Param.Int(4, "Number of cache banks")
+    bank_intlv_high_bit = Param.Int(0,
+        "Cache bank interleave highest bit "
+        "(0 = automatically aligned to cache line granularity)")
+    unlocked_tags = Param.Bool(True,
+        "Allow to check tags even if the bank is blocked")
 
     warmup_percentage = Param.Percent(0,
         "Percentage of tags to be touched to warm up the cache")

@@ -45,15 +45,16 @@ from m5.objects import *
 from common.Caches import *
 from common import ObjectList
 
-def _get_hwp(hwp_option):
+def _get_hwp(hwp_option, params):
     if hwp_option == None:
         return NULL
 
     hwpClass = ObjectList.hwp_list.get(hwp_option)
-    return hwpClass()
+    return hwpClass(**params)
 
 def _get_cache_opts(level, options):
     opts = {}
+    hwp_opts = {}
 
     size_attr = '{}_size'.format(level)
     if hasattr(options, size_attr):
@@ -63,9 +64,52 @@ def _get_cache_opts(level, options):
     if hasattr(options, assoc_attr):
         opts['assoc'] = getattr(options, assoc_attr)
 
+    enable_banks_attr = '{}_enable_banks'.format(level)
+    if hasattr(options, enable_banks_attr):
+        opts['enable_banks'] = getattr(options, enable_banks_attr)
+
+    num_banks_attr = '{}_num_banks'.format(level)
+    if hasattr(options, num_banks_attr):
+        opts['num_banks'] = getattr(options, num_banks_attr)
+
+    intlv_bit_attr = '{}_intlv_bit'.format(level)
+    if hasattr(options, intlv_bit_attr):
+        opts['bank_intlv_high_bit'] = getattr(options, intlv_bit_attr)
+
+    tag_latency_attr = '{}_tag_lat'.format(level)
+    if hasattr(options, tag_latency_attr):
+        opts['tag_latency'] = getattr(options, tag_latency_attr)
+
+    data_latency_attr = '{}_data_lat'.format(level)
+    if hasattr(options, data_latency_attr):
+        opts['data_latency'] = getattr(options, data_latency_attr)
+
+    write_latency_attr = '{}_write_lat'.format(level)
+    if hasattr(options, write_latency_attr):
+        opts['write_latency'] = getattr(options, write_latency_attr)
+
+    response_latency_attr = '{}_resp_lat'.format(level)
+    if hasattr(options, response_latency_attr):
+        opts['response_latency'] = getattr(options, response_latency_attr)
+
+    prefetcher_degree_attr = '{}_hwp_deg'.format(level)
+    if hasattr(options, prefetcher_degree_attr):
+        hwp_opts['degree'] = getattr(options, prefetcher_degree_attr)
+
+    prefetcher_latency_attr = '{}_hwp_lat'.format(level)
+    if hasattr(options, prefetcher_latency_attr):
+        hwp_opts['latency'] = getattr(options, prefetcher_latency_attr)
+
+    prefetcher_qs_attr = '{}_hwp_qs'.format(level)
+    if hasattr(options, prefetcher_qs_attr):
+        hwp_opts['queue_size'] = getattr(options, prefetcher_qs_attr)
+
     prefetcher_attr = '{}_hwp_type'.format(level)
     if hasattr(options, prefetcher_attr):
-        opts['prefetcher'] = _get_hwp(getattr(options, prefetcher_attr))
+        opts['prefetcher'] = \
+            _get_hwp(getattr(options, prefetcher_attr), hwp_opts)
+    elif options.hwp_override:
+        opts['prefetcher'] = m5.params.NULL
 
     return opts
 

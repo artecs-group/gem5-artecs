@@ -48,6 +48,7 @@
 
 #include <cassert>
 #include <cstdint>
+#include <queue>
 #include <string>
 
 #include "base/addr_range.hh"
@@ -117,6 +118,26 @@ class BaseCache : public ClockedObject
     };
 
     /**
+     * Reasons for banks to be busy.
+     */
+    enum BankBusyCause {
+        Busy_ReadPkt_CpuSidePort,
+        Busy_WritePkt_CpuSidePort,
+        Busy_ReadPkt_MemSidePort
+    };
+
+    /**
+     * Type of data array access.
+     */
+    enum ArrayAccessType {
+        None,
+        FailExp,
+        Read,
+        Write,
+        Writeback
+    };
+
+    /**
      * A data contents update is composed of the updated block's address,
      * the old contents, and the new contents.
      * @sa ppDataUpdate
@@ -139,6 +160,116 @@ class BaseCache : public ClockedObject
     };
 
   protected:
+
+    /*
+    * A single data array bank within the cache. Multiple instances of this
+    * class can be present according to the num_banks parameter. It includes
+    * methods to set and unset the bank in service, to extend the service time
+    * and to verify the bank activity status
+    */
+    class Bank
+    {
+      private:
+        /* Descriptive name for DPRINTF */
+        std::string bankName;
+
+        /* Bank service status */
+        bool inService;
+
+        /* A packet has come while the bank was busy */
+        bool mustSendRetry;
+
+        /* At least one bank conflict has happened during the operation */
+        bool conflict;
+
+        /* Cause of utilization */
+        BankBusyCause busyCause;
+
+        /* Descriptive name for DPRINTF */
+        Tick nextIdleTick;
+
+        /* List of pending update busy events */
+        std::queue<Tick> updateBusyList;
+
+        /* updateBusyEvent processing routine */
+        void processUpdateBusy();
+
+        /* endServiceEvent processing routine */
+        void processEndService();
+
+        /* bankSendRetryEvent processing routine */
+        void processSendRetry();
+
+      public:
+
+        /*  Mark this cache bank in service until finishTick */
+        void markInService(Tick finishTick, BankBusyCause newCause);
+
+        /*  Unmark this cache bank in service */
+        void unmarkInService();
+
+        /*  Extend this bank service time by extraTick */
+        void extendService(Tick extraTick);
+
+        /*  Set bankMustSendRetry to true */
+        void setRetryFlag();
+
+        /*  Indicate that a bank conflict has happened */
+        void setConflict();
+
+        /*  Reset the conflict flag */
+        void resetConflict();
+
+        Bank(const std::string &_name, BaseCache *owner) :
+            bankName(_name),
+            inService(false),
+            mustSendRetry(false),
+            conflict(false),
+            busyCause((BankBusyCause)0),
+            nextIdleTick(0),
+            owner(*owner),
+            updateBusyEvent([this]{ processUpdateBusy(); }, _name),
+            endServiceEvent([this]{ processEndService(); }, _name),
+            sendRetryEvent([this]{ processSendRetry(); }, _name)
+        { }
+
+        /*  Return the status of the bank (in service or not) */
+        bool isBusy() const { return inService; }
+
+        /*  Return true if any conflict has happened during the operation */
+        bool anyConflict() const { return conflict; }
+
+        /*  Return the reason why the bank is busy */
+        BankBusyCause whyBusy() const { return busyCause; }
+
+        /*  Return the next tick when the bank will be idle */
+        Tick finishTick() const { return nextIdleTick; }
+
+        /*  Return bank name */
+        const std::string name() const { return bankName; }
+
+      protected:
+
+        /* A reference to the BaseCache that owns this bank. */
+        BaseCache& owner;
+
+        /**
+         * Event scheduled once after executing extendService()
+         * to have BankBusyCause updated at the right time
+         */
+        EventFunctionWrapper updateBusyEvent;
+
+        /**
+         * Event scheduled after marking a bank in service or extending
+         * service time, to unmark it at the end of the last operation
+         */
+        EventFunctionWrapper endServiceEvent;
+
+        /**
+         * Event scheduled to issue a packet send retry request
+         */
+        EventFunctionWrapper sendRetryEvent;
+    };
 
     /**
      * A cache request port is used for the memory-side port of the
@@ -296,12 +427,11 @@ class BaseCache : public ClockedObject
 
         bool mustSendRetry;
 
+        EventFunctionWrapper sendRetryEvent;
+
       private:
 
         void processSendRetry();
-
-        EventFunctionWrapper sendRetryEvent;
-
     };
 
     /**
@@ -339,6 +469,9 @@ class BaseCache : public ClockedObject
     MemSidePort memSidePort;
 
   protected:
+
+    /* Data array banks */
+    std::vector<Bank *> banks;
 
     /** Miss status registers */
     MSHRQueue mshrQueue;
@@ -481,15 +614,25 @@ class BaseCache : public ClockedObject
                                   const Cycles lookup_lat) const;
 
     /**
+     * Checks whether a request is going to actually access the data array or
+     * it can be handled only looking at the cache, writebuffer or MSHR tags.
+     *
+     * @param pkt The memory request to perform.
+     * @return Whether the block will be accessed or not.
+     */
+    bool checkDataArrayAccess(PacketPtr pkt);
+
+    /**
      * Does all the processing necessary to perform the provided request.
      * @param pkt The memory request to perform.
      * @param blk The cache block to be updated.
      * @param lat The latency of the access.
      * @param writebacks List for any writebacks that need to be performed.
+     * @param data_access Which type of data array access is performed.
      * @return Boolean indicating whether the request was satisfied.
      */
     virtual bool access(PacketPtr pkt, CacheBlk *&blk, Cycles &lat,
-                        PacketList &writebacks);
+                        PacketList &writebacks, ArrayAccessType &data_access);
 
     /*
      * Handle a timing request that hit in the cache
@@ -916,6 +1059,38 @@ class BaseCache : public ClockedObject
      */
     const Cycles responseLatency;
 
+    /*
+    * The latency to write data into the cache
+    */
+    const Cycles writeLatency;
+
+    /* Enable banking feature for the cache */
+    const bool enableBanks;
+
+    /* Number of cache array data banks */
+    const unsigned numBanks;
+
+    /* Number of cache bank interleave bits */
+    const unsigned bankIntlvBits;
+
+    /* Cache data array bank interleave high bit */
+    const unsigned bankIntlvHighBit;
+
+    /* Cache data array bank interleave low bit */
+    const unsigned bankIntlvLowBit;
+
+    /* Cache data array bank interleave mask */
+    const Addr bankIntlvMask;
+
+    /* Allow lookup tags even if blocked bank */
+    const bool unlockedTags;
+
+    /* Stores the number of blocked banks */
+    unsigned bankBlockedNum;
+
+    /* Stores the time of the last bank event (in ticks) */
+    Tick bankLastEvent;
+
     /**
      * Whether tags and data are accessed sequentially.
      */
@@ -1142,6 +1317,41 @@ class BaseCache : public ClockedObject
          */
         statistics::Scalar dataContractions;
 
+        /* Number of ticks (i) banks are used concurrently */
+        statistics::Vector concurrentBanksTicks;
+        /* Number of cycles (i) banks are used concurrently */
+        statistics::Vector concurrentBanksCycles;
+        /* Ratio of time (i) banks are used concurrently */
+        statistics::Formula concurrentBanksRatio;
+        /* Weight of each number of concurrent banks */
+        statistics::Vector concurrentBanksWeight;
+        /* Average ratio of active banks during the execution */
+        statistics::Formula averageBankActivity;
+        /* Number of read operations performed on a bank */
+        statistics::Vector2d bankNumReads;
+        /* Number of write operations performed on a bank */
+        statistics::Vector2d bankNumWrites;
+        /* Number of ticks a bank is blocked */
+        statistics::Vector2d bankBlockedTicks;
+        /* Number of cycles a bank is blocked */
+        statistics::Vector2d bankBlockedCycles;
+        /* Number of rescheduled requests because the bank is blocked */
+        statistics::Vector2d bankBlockedRetryPkts;
+        /* Number of ticks requests are rescheduled per bank */
+        statistics::Vector2d bankBlockedRetryTicks;
+        /* Rescheduled requests while reading from CpuSidePort */
+        statistics::Vector2d bankCflBusyblkCpuspRead;
+        /* Rescheduled requests while writing from CpuSidePort */
+        statistics::Vector2d bankCflBusyblkCpuspWrite;
+        /* Rescheduled requests while filling from MemSidePort */
+        statistics::Vector2d bankCflBusyblkMemspFill;
+        /* Read requests rescheduled due to a bank being busy */
+        statistics::Vector2d bankCflTargetblkCpuspRead;
+        /* Write/wb requests rescheduled due to a bank being busy */
+        statistics::Vector2d bankCflTargetblkCpuspWrite;
+        /* Write fills rescheduled due to a bank being busy */
+        statistics::Vector2d bankCflTargetblkMemspFill;
+
         /** Per-command statistics */
         std::vector<std::unique_ptr<CacheCmdStats>> cmd;
     } stats;
@@ -1166,6 +1376,17 @@ class BaseCache : public ClockedObject
     getBlockSize() const
     {
         return blkSize;
+    }
+
+    /**
+     * Query the corresponding bank ID from a memory address
+     * @return  The bank ID
+     */
+    unsigned
+    getBankId(Addr addr) const
+    {
+        //TODO add parameter for choosing allocation types and get accordingly?
+        return (addr & bankIntlvMask) >> bankIntlvLowBit;
     }
 
     const AddrRangeList &getAddrRanges() const { return addrRanges; }
@@ -1309,6 +1530,16 @@ class BaseCache : public ClockedObject
         assert(pkt->req->requestorId() < system->maxRequestors());
         stats.cmdStats(pkt).hits[pkt->req->requestorId()]++;
     }
+
+    /**
+     * Update the log when a bank is marked in service
+     */
+    void logBankInService(Tick time);
+
+    /**
+     * Update the log when a bank is marked out of service
+     */
+    void logBankOutOfService(Tick time);
 
     /**
      * Checks if the cache is coalescing writes

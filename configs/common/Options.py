@@ -153,6 +153,49 @@ def addNoISAOptions(parser):
     parser.add_argument("--l2_assoc", type=int, default=8)
     parser.add_argument("--l3_assoc", type=int, default=16)
     parser.add_argument("--cacheline_size", type=int, default=64)
+    parser.add_argument("--hwp-override", action="store_true")
+    parser.add_argument("--l1i-tag-lat", type=int, default="2",
+                         help="L1I tag lookup latency (cycles)")
+    parser.add_argument("--l1d-tag-lat", type=int, default="2",
+                         help="L1D tag lookup latency (cycles)")
+    parser.add_argument("--l2-tag-lat", type=int, default="20",
+                         help="L2 tag lookup latency (cycles)")
+    parser.add_argument("--l1i-data-lat", type=int, default="2",
+                         help="L1I hit latency (cycles)")
+    parser.add_argument("--l1d-data-lat", type=int, default="2",
+                         help="L1D hit latency (cycles)")
+    parser.add_argument("--l2-data-lat", type=int, default="20",
+                         help="L2 hit latency (cycles)")
+    parser.add_argument("--l1i-write-lat", type=int, default="2",
+                         help="L1I write latency (cycles)")
+    parser.add_argument("--l1d-write-lat", type=int, default="2",
+                         help="L1D write latency (cycles)")
+    parser.add_argument("--l2-write-lat", type=int, default="20",
+                         help="L2 write latency (cycles)")
+    parser.add_argument("--l1i-resp-lat", type=int, default="2",
+                         help="L1I response latency (cycles)")
+    parser.add_argument("--l1d-resp-lat", type=int, default="2",
+                         help="L1D response latency (cycles)")
+    parser.add_argument("--l2-resp-lat", type=int, default="20",
+                         help="L2 response latency (cycles)")
+    parser.add_argument("--l1i-enable-banks", action="store_true",
+                         help="Enable L1I bank model")
+    parser.add_argument("--l1d-enable-banks", action="store_true",
+                         help="Enable L1D bank model")
+    parser.add_argument("--l2-enable-banks", action="store_true",
+                         help="Enable L2 bank model")
+    parser.add_argument("--l1i-num-banks", type=int, default="4",
+                         help="Number of L1I cache banks")
+    parser.add_argument("--l1d-num-banks", type=int, default="4",
+                         help="Number of L1D cache banks")
+    parser.add_argument("--l2-num-banks", type=int, default="4",
+                         help="Number of L2 banks")
+    parser.add_argument("--l1i-intlv-bit", type=int, default="0",
+                         help="L1I bank interleave highest bit")
+    parser.add_argument("--l1d-intlv-bit", type=int, default="0",
+                         help="L1D bank interleave highest bit")
+    parser.add_argument("--l2-intlv-bit", type=int, default="0",
+                         help="L2 bank interleave highest bit")
 
     # Enable Ruby
     parser.add_argument("--ruby", action="store_true")
@@ -236,6 +279,24 @@ def addCommonOptions(parser):
                         type of hardware prefetcher to use with the L2 cache.
                         (if not set, use the default prefetcher of
                         the selected cache)""")
+    parser.add_argument("--l1i-hwp-deg", type=int, default="0",
+                        help="L1I prefetcher degree")
+    parser.add_argument("--l1d-hwp-deg", type=int, default="0",
+                        help="L1D prefetcher degree")
+    parser.add_argument("--l2-hwp-deg", type=int, default="0",
+                        help="L2 prefetcher degree")
+    parser.add_argument("--l1i-hwp-lat", type=int, default="0",
+                        help="L1I prefetcher latency")
+    parser.add_argument("--l1d-hwp-lat", type=int, default="0",
+                        help="L1D prefetcher latency")
+    parser.add_argument("--l2-hwp-lat", type=int, default="0",
+                        help="L2 prefetcher latency")
+    parser.add_argument("--l1i-hwp-qs", type=int, default="0",
+                        help="L1I prefetcher queue size")
+    parser.add_argument("--l1d-hwp-qs", type=int, default="0",
+                        help="L1D prefetcher queue size")
+    parser.add_argument("--l2-hwp-qs", type=int, default="0",
+                        help="L2 prefetcher queue size")
     parser.add_argument("--checker", action="store_true")
     parser.add_argument("--cpu-clock", action="store", type=str,
                         default='2GHz',
