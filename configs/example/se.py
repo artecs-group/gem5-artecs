@@ -180,7 +180,7 @@ system.clk_domain = SrcClockDomain(clock =  args.sys_clock,
                                    voltage_domain = system.voltage_domain)
 
 # Create a CPU voltage domain
-system.cpu_voltage_domain = VoltageDomain()
+system.cpu_voltage_domain = VoltageDomain(voltage = args.cpu_voltage)
 
 # Create a separate clock domain for the CPUs
 system.cpu_clk_domain = SrcClockDomain(clock = args.cpu_clock,

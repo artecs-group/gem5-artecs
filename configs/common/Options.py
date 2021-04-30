@@ -301,6 +301,9 @@ def addCommonOptions(parser):
     parser.add_argument("--cpu-clock", action="store", type=str,
                         default='2GHz',
                         help="Clock for blocks running at CPU speed")
+    parser.add_argument("--cpu-voltage", action="store", type=str,
+                        default='1.0V',
+                        help="Voltage for blocks running at CPU power supply")
     parser.add_argument("--smt", action="store_true", default=False,
                         help="""
                       Only used if multiple programs are specified. If true,
