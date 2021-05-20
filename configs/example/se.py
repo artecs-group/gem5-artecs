@@ -189,7 +189,8 @@ system.cpu_clk_domain = SrcClockDomain(clock = args.cpu_clock,
 
 # If elastic tracing is enabled, then configure the cpu and attach the elastic
 # trace probe
-if args.elastic_trace_en:
+if args.elastic_trace_en and args.checkpoint_restore is None and \
+        not args.fast_forward:
     CpuConfig.config_etrace(CPUClass, system.cpu, args)
 
 # All cpus belong to a common cpu_clk_domain, therefore running at a common
