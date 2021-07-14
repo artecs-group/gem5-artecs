@@ -41,6 +41,7 @@
 #ifndef __CPU_SIMPLE_ATOMIC_HH__
 #define __CPU_SIMPLE_ATOMIC_HH__
 
+#include "base/output.hh"
 #include "cpu/simple/base.hh"
 #include "cpu/simple/exec_context.hh"
 #include "mem/request.hh"
@@ -66,6 +67,7 @@ class AtomicSimpleCPU : public BaseSimpleCPU
     bool locked;
     const bool simulate_data_stalls;
     const bool simulate_inst_stalls;
+    const bool dump_mem_obj_table;
 
     // main simulation loop (one cycle)
     void tick();
@@ -173,6 +175,52 @@ class AtomicSimpleCPU : public BaseSimpleCPU
     /** Probe Points. */
     ProbePointArg<std::pair<SimpleThread *, const StaticInstPtr>> *ppCommit;
 
+    /** Information to store for each memory object */
+    class MemObjectEntry
+    {
+      public:
+
+        int id;
+        Addr start;
+        int size;
+        bool valid;
+
+        MemObjectEntry() {
+            id = 0;
+            start = 0;
+            size = 0;
+            valid = true;
+        }
+    };
+
+    /** Memory objects counter (for ID generation) */
+    int memObjCounter;
+
+    /** Memory object waiting to be saved */
+    std::map<ThreadID, MemObjectEntry> pendingMemObj;
+
+    /** Memory objects table */
+    std::vector<MemObjectEntry> memObjTable;
+
+    /** Output stream to write the list of memory objects **/
+    OutputStream *memObjOutStream;
+
+    /** Output stream to write the history of freed memory objects **/
+    OutputStream *freedObjOutStream;
+
+    /** List of names of common dynamic memory allocation routines */
+    const std::vector<std::string> dynAllocRtnNames =
+            { "malloc", "calloc", "posix_memalign", "free" };
+
+    /** List of instruction pointers corresponding to allocation routines */
+    std::map<Addr, std::string> dynAllocRtnAddr;
+
+    /** Check which dynamic memory allocation routine is being executed */
+    std::map<ThreadID, std::string> dynAllocRtnExec;
+
+    /** Stack Pointer of the currently executed allocation routine */
+    std::map<ThreadID, Addr> dynAllocRtnSP;
+
   protected:
 
     /** Return a reference to the data port. */
@@ -183,6 +231,9 @@ class AtomicSimpleCPU : public BaseSimpleCPU
 
     /** Perform snoop for other cpu-local thread contexts. */
     void threadSnoop(PacketPtr pkt, ThreadID sender);
+
+    /** Detect dynamic memory allocation routines */
+    void detectDynAllocRtn(Addr pc);
 
   public:
 

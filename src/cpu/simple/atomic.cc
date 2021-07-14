@@ -41,6 +41,8 @@
 
 #include "cpu/simple/atomic.hh"
 
+#include <boost/format.hpp>
+
 #include "arch/generic/decoder.hh"
 #include "base/output.hh"
 #include "config/the_isa.hh"
@@ -55,7 +57,12 @@
 #include "params/AtomicSimpleCPU.hh"
 #include "sim/faults.hh"
 #include "sim/full_system.hh"
+#include "sim/process.hh"
 #include "sim/system.hh"
+
+// https://stackoverflow.com/a/10791845
+#define XSTR(x) STR(x)
+#define STR(x) #x
 
 namespace gem5
 {
@@ -70,6 +77,34 @@ AtomicSimpleCPU::init()
     data_read_req->setContext(cid);
     data_write_req->setContext(cid);
     data_amo_req->setContext(cid);
+
+    if (dump_mem_obj_table and !strcmp(XSTR(TheISA), "X86ISA")) {
+        // Initialize memory objects counter
+        memObjCounter = 2;
+
+        // Create memory objects files in the output directory
+        memObjOutStream = simout.create("mem_objects.csv", false, true);
+        freedObjOutStream = simout.create("freed_objects.csv", false, true);
+
+        // Write headers to output files
+        *memObjOutStream->stream()
+                << "id,st_addr,size,type,creat_cyc"
+                << std::endl
+                << "0,0x0,0,default,0" << std::endl
+                << "1,0x1,0,stack,0" << std::endl;
+        *freedObjOutStream->stream()
+                << "id,obj_count,dest_cyc" << std::endl;
+
+        // Store instruction pointers of memory allocation routines
+        Process *p = threadContexts[0]->getProcessPtr();
+        const Loader::SymbolTable symtab = p->objFile->symtab();
+        for (auto it = symtab.begin(); it != symtab.end(); it++) {
+            auto &tgt = dynAllocRtnNames;
+            if (std::find(tgt.begin(), tgt.end(), it->name) != tgt.end()) {
+                dynAllocRtnAddr[it->address] = it->name;
+            }
+        }
+    }
 }
 
 AtomicSimpleCPU::AtomicSimpleCPU(const AtomicSimpleCPUParams &p)
@@ -79,10 +114,12 @@ AtomicSimpleCPU::AtomicSimpleCPU(const AtomicSimpleCPUParams &p)
       width(p.width), locked(false),
       simulate_data_stalls(p.simulate_data_stalls),
       simulate_inst_stalls(p.simulate_inst_stalls),
+      dump_mem_obj_table(p.dump_mem_obj_table),
       icachePort(name() + ".icache_port", this),
       dcachePort(name() + ".dcache_port", this),
       dcache_access(false), dcache_latency(0),
-      ppCommit(nullptr)
+      ppCommit(nullptr),
+      memObjOutStream(nullptr), freedObjOutStream(nullptr)
 {
     _status = Idle;
     ifetch_req = std::make_shared<Request>();
@@ -610,6 +647,121 @@ AtomicSimpleCPU::amoMem(Addr addr, uint8_t* data, unsigned size,
 }
 
 void
+AtomicSimpleCPU::detectDynAllocRtn(Addr pc)
+{
+    // System V AMD64 ABI calling convention registers
+    const RegIndex X86ABIArgs[3] = {
+        X86ISA::INTREG_RDI,
+        X86ISA::INTREG_RSI,
+        X86ISA::INTREG_RDX
+    };
+    const RegIndex X86ABIRet = X86ISA::INTREG_RAX;
+
+    ThreadID tid = curThread;
+
+    // Initialize per-thread support structures
+    if (dynAllocRtnExec.find(tid) == dynAllocRtnExec.end()) {
+        dynAllocRtnExec[tid] = "none";
+        MemObjectEntry empty;
+        pendingMemObj[tid] = empty;
+    }
+
+    ThreadContext *tc = threadContexts[curThread];
+    if (dynAllocRtnExec[tid] == "none") {
+        // Check for dynamic memory allocation routines
+        auto it = dynAllocRtnAddr.find(pc);
+        if (it != dynAllocRtnAddr.end()) {
+            // Entering routine
+            std::string type = it->second;
+            dynAllocRtnExec[tid] = type;
+            dynAllocRtnSP[tid] = tc->readIntReg(X86ISA::INTREG_SP);
+            // Save info according to the routine type
+            if (type == "free") {
+                pendingMemObj[tid].start = tc->readIntReg(X86ABIArgs[0]);
+            } else {
+                pendingMemObj[tid].id = memObjCounter++;
+                if (type == "malloc") {
+                    pendingMemObj[tid].size =
+                            tc->readIntReg(X86ABIArgs[0]);
+                } else if (type == "calloc") {
+                    int size = tc->readIntReg(X86ABIArgs[0]);
+                    int num = tc->readIntReg(X86ABIArgs[1]);
+                    pendingMemObj[tid].size = size * num;
+                } else if (type == "posix_memalign") {
+                    pendingMemObj[tid].size =
+                            tc->readIntReg(X86ABIArgs[2]);
+                    // Temporarily store the pointer here
+                    // (not the real start address!)
+                    pendingMemObj[tid].start =
+                            tc->readIntReg(X86ABIArgs[0]);
+                }
+            }
+        }
+    } else {
+        if (tc->readIntReg(X86ISA::INTREG_SP) > dynAllocRtnSP[tid]) {
+            // Exiting from routine
+            std::string type = dynAllocRtnExec[tid];
+            if (type == "malloc" or type == "calloc") {
+                pendingMemObj[tid].start = tc->readIntReg(X86ABIRet);
+            } else if (type == "posix_memalign") {
+                // Replace start address with the real one
+                Addr orig = pendingMemObj[tid].start;
+                Addr p_orig, start;
+                Process *p = threadContexts[tid]->getProcessPtr();
+                // Page table lookup (vaddr -> paddr)
+                p->pTable->translate(orig, p_orig);
+                RequestPtr req = std::make_shared<Request>(
+                        p_orig, sizeof(Addr), 0, Request::funcRequestorId);
+                PacketPtr pkt = new Packet(req, MemCmd::ReadReq);
+                pkt->allocate();
+                dcachePort.sendFunctional(pkt);
+                start = pkt->getLE<Addr>();
+                delete pkt;
+                pendingMemObj[tid].start = start;
+            }
+            if (type != "free") {
+                // Add pending object to the table
+                memObjTable.push_back(pendingMemObj[tid]);
+                // Print output file entry
+                *memObjOutStream->stream()
+                        << pendingMemObj[tid].id << ","
+                        << boost::format("0x%lx")
+                                    % pendingMemObj[tid].start << ","
+                        << pendingMemObj[tid].size << ","
+                        << type << ","
+                        << baseStats.numCycles.value()
+                        << std::endl;
+            } else {
+                MemObjectEntry& x = pendingMemObj[tid];
+                auto it = std::find_if(
+                        memObjTable.begin(),
+                        memObjTable.end(),
+                        [&x] (const MemObjectEntry& e)
+                        {
+                            if (e.valid) {
+                                return e.start == x.start;
+                            }
+                            return false;
+                        });
+                if (it != memObjTable.end()) {
+                    it->valid = false;
+                    // Print freed objects entry
+                    *freedObjOutStream->stream()
+                            << it->id << ","
+                            << memObjCounter << ","
+                            << baseStats.numCycles.value()
+                            << std::endl;
+                } else {
+                    // Unrecognized object? ¯\_(ツ)_/¯
+                }
+            }
+            // Reset executed routine to none
+            dynAllocRtnExec[tid] = "none";
+        }
+    }
+}
+
+void
 AtomicSimpleCPU::tick()
 {
     DPRINTF(SimpleCPU, "Tick\n");
@@ -689,6 +841,10 @@ AtomicSimpleCPU::tick()
                 if (fault == NoFault) {
                     countInst();
                     ppCommit->notify(std::make_pair(thread, curStaticInst));
+                    if (dump_mem_obj_table &&
+                        !strcmp(XSTR(TheISA), "X86ISA")) {
+                        detectDynAllocRtn(pc.instAddr());
+                    }
                 } else if (traceData) {
                     traceFault();
                 }
