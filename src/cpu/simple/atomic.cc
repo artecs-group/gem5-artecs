@@ -115,6 +115,7 @@ AtomicSimpleCPU::AtomicSimpleCPU(const AtomicSimpleCPUParams &p)
       simulate_data_stalls(p.simulate_data_stalls),
       simulate_inst_stalls(p.simulate_inst_stalls),
       dump_mem_obj_table(p.dump_mem_obj_table),
+      mem_obj_min_size(p.mem_obj_min_size),
       icachePort(name() + ".icache_port", this),
       dcachePort(name() + ".dcache_port", this),
       dcache_access(false), dcache_latency(0),
@@ -673,28 +674,37 @@ AtomicSimpleCPU::detectDynAllocRtn(Addr pc)
         if (it != dynAllocRtnAddr.end()) {
             // Entering routine
             std::string type = it->second;
-            dynAllocRtnExec[tid] = type;
-            dynAllocRtnSP[tid] = tc->readIntReg(X86ISA::INTREG_SP);
+            bool valid = true;
             // Save info according to the routine type
             if (type == "free") {
                 pendingMemObj[tid].start = tc->readIntReg(X86ABIArgs[0]);
             } else {
-                pendingMemObj[tid].id = memObjCounter++;
+                int tot_size = 0;
                 if (type == "malloc") {
-                    pendingMemObj[tid].size =
-                            tc->readIntReg(X86ABIArgs[0]);
+                    tot_size = tc->readIntReg(X86ABIArgs[0]);
                 } else if (type == "calloc") {
                     int size = tc->readIntReg(X86ABIArgs[0]);
                     int num = tc->readIntReg(X86ABIArgs[1]);
-                    pendingMemObj[tid].size = size * num;
+                    tot_size = size * num;
                 } else if (type == "posix_memalign") {
-                    pendingMemObj[tid].size =
-                            tc->readIntReg(X86ABIArgs[2]);
+                    tot_size = tc->readIntReg(X86ABIArgs[2]);
                     // Temporarily store the pointer here
                     // (not the real start address!)
                     pendingMemObj[tid].start =
                             tc->readIntReg(X86ABIArgs[0]);
                 }
+                // Do not track objects with size lower than the minimum
+                if (tot_size < mem_obj_min_size) {
+                    valid = false;
+                } else {
+                    pendingMemObj[tid].id = memObjCounter++;
+                    pendingMemObj[tid].size = tot_size;
+                }
+            }
+            if (valid) {
+                dynAllocRtnExec[tid] = type;
+                dynAllocRtnSP[tid] =
+                        tc->readIntReg(X86ISA::INTREG_SP);
             }
         }
     } else {

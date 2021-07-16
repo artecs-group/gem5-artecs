@@ -61,6 +61,7 @@ class AtomicSimpleCPU(BaseSimpleCPU):
     simulate_data_stalls = Param.Bool(False, "Simulate dcache stall cycles")
     simulate_inst_stalls = Param.Bool(False, "Simulate icache stall cycles")
     dump_mem_obj_table = Param.Bool(False, "Dump memory objects table (x86)")
+    mem_obj_min_size = Param.UInt32(1024, "Min. memory objects size (bytes)")
 
     def addSimPointProbe(self, interval):
         simpoint = SimPoint()

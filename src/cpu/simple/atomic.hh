@@ -68,6 +68,7 @@ class AtomicSimpleCPU : public BaseSimpleCPU
     const bool simulate_data_stalls;
     const bool simulate_inst_stalls;
     const bool dump_mem_obj_table;
+    const uint32_t mem_obj_min_size;
 
     // main simulation loop (one cycle)
     void tick();
