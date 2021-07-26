@@ -98,10 +98,11 @@ AtomicSimpleCPU::init()
         // Store instruction pointers of memory allocation routines
         Process *p = threadContexts[0]->getProcessPtr();
         const Loader::SymbolTable symtab = p->objFile->symtab();
-        for (auto it = symtab.begin(); it != symtab.end(); it++) {
-            auto &tgt = dynAllocRtnNames;
-            if (std::find(tgt.begin(), tgt.end(), it->name) != tgt.end()) {
-                dynAllocRtnAddr[it->address] = it->name;
+        auto &rtns = dynAllocRtnNames;
+        for (auto it = rtns.begin(); it != rtns.end(); it++) {
+            auto sym = symtab.find(*it);
+            if (sym != symtab.end()) {
+                dynAllocRtnAddr[sym->address] = *it;
             }
         }
     }
