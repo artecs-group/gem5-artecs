@@ -53,6 +53,7 @@ class L1Cache(Cache):
     write_latency = 2
     response_latency = 2
     mshrs = 4
+    size = '32kB'
     tgts_per_mshr = 20
 
 class L1_ICache(L1Cache):
@@ -70,6 +71,7 @@ class L2Cache(Cache):
     write_latency = 20
     response_latency = 20
     mshrs = 20
+    size = '2MB'
     tgts_per_mshr = 12
     write_buffers = 8
 
@@ -80,6 +82,7 @@ class L3Cache(Cache):
     response_latency = 50
     write_latency = 50
     mshrs = 24
+    size = '16MB'
     tgts_per_mshr = 20
     write_buffers = 10
 
