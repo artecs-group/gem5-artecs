@@ -98,8 +98,11 @@ def config_filesystem(system, options = None):
         cpu_clock = toFrequency(options.cpu_clock) / mega
 
     l2_size = 0
-    if hasattr(options, 'l2_size'):
-        l2_size = toMemorySize(options.l2_size) / kibi
+    if hasattr(system, 'l2'):
+        if isinstance(system.l2, m5.params.SimObjectVector):
+            l2_size = int(system.l2[0].size.getValue() / kibi)
+        else:
+            l2_size = int(system.l2.size.getValue() / kibi)
 
     for i,cpu in enumerate(cpus):
         one_cpu = 'processor       : {proc}\n'                    + \
