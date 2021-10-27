@@ -94,7 +94,7 @@ def config_filesystem(system, options = None):
         cpus = []
 
     cpu_clock = 0
-    if hasattr(options, 'cpu_clock'):
+    if getattr(options, 'cpu_clock', None) is not None:
         cpu_clock = toFrequency(options.cpu_clock) / mega
 
     l2_size = 0
