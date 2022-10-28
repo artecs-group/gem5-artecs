@@ -1242,6 +1242,13 @@ BaseCache::handleEvictions(std::vector<CacheBlk*> &evict_blks,
         // Evict valid blocks associated to this victim block
         for (auto& blk : evict_blks) {
             if (blk->isValid()) {
+                // Log accessed bytes of the victim block
+                unsigned int accBytes = countOnes(blk->getAccessMask());
+                unsigned int accBytesIdx = !accBytes ? 0 : (accBytes - 1) / 8;
+                stats.accessedBytes[accBytesIdx] += 1;
+                // Clear the accessed bytes mask
+                blk->clearAccessMask();
+                // Evict the block
                 evictBlock(blk, writebacks);
             }
         }
@@ -1418,6 +1425,11 @@ BaseCache::satisfyRequest(PacketPtr pkt, CacheBlk *blk, bool, bool)
         // Write or WriteLine at the first cache with block in writable state
         if (blk->checkWrite(pkt)) {
             updateBlockData(blk, pkt, true);
+            if (pkt->cmd == MemCmd::WriteReq ||
+                pkt->cmd == MemCmd::WriteLineReq) {
+                blk->markAccessed(pkt->getOffset(blkSize),
+                                  pkt->getSize(), blkSize);
+            }
         }
         // Always mark the line as dirty (and thus transition to the
         // Modified state) even if we are a failed StoreCond so we
@@ -1433,6 +1445,10 @@ BaseCache::satisfyRequest(PacketPtr pkt, CacheBlk *blk, bool, bool)
         // all read responses have a data payload
         assert(pkt->hasRespData());
         pkt->setDataFromBlock(blk->data, blkSize);
+        if (pkt->cmd == MemCmd::ReadReq) {
+            blk->markAccessed(pkt->getOffset(blkSize),
+                              pkt->getSize(), blkSize);
+        }
     } else if (pkt->isUpgrade()) {
         // sanity check
         assert(!pkt->hasSharers());
@@ -2638,6 +2654,8 @@ BaseCache::CacheStats::CacheStats(BaseCache &c)
              "number of data expansions"),
     ADD_STAT(dataContractions, statistics::units::Count::get(),
              "number of data contractions"),
+    ADD_STAT(accessedBytes, statistics::units::Count::get(),
+             "distribution of accessed bytes in blocks before eviction"),
     ADD_STAT(concurrentBanksTicks, statistics::units::Tick::get(),
            "number of ticks (i) banks are used concurrently"),
     ADD_STAT(concurrentBanksCycles, statistics::units::Cycle::get(),
@@ -2901,6 +2919,13 @@ BaseCache::CacheStats::regStats()
         overallAvgMshrUncacheableLatency.subname(i,
             system->getRequestorName(i));
     }
+
+    accessedBytes
+        .init(cache.blkSize / 8)
+        .flags(total | nozero)
+        ;
+    for (int b = 0; b < cache.blkSize / 8; b++)
+        accessedBytes.subname(b, std::to_string((b + 1) * 8));
 
     concurrentBanksTicks
         .init(num_banks + 1)

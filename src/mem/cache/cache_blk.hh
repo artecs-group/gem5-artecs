@@ -257,6 +257,22 @@ class CacheBlk : public TaggedEntry
     /** Marks this blocks as a recently prefetched block. */
     void setPrefetched() { _prefetched = true; }
 
+    /* Mark accessed bytes in the block access mask */
+    void markAccessed(Addr offset, unsigned int size, unsigned int blk_size) {
+        assert(blk_size <= 64);
+        _accessMask |= (uint64_t)((((1ULL << (offset + size - 1)) - 1) |
+                                    (1ULL << (offset + size - 1))) &
+                                  ~((1ULL << offset) - 1));
+    }
+
+    /* Get the block access mask */
+    uint64_t getAccessMask() const { return _accessMask; }
+
+    /* Clear the block access mask */
+    void clearAccessMask() {
+        _accessMask = 0;
+    }
+
     /**
      * Get tick at which block's data will be available for access.
      *
@@ -490,6 +506,9 @@ class CacheBlk : public TaggedEntry
 
     /** Whether this block is an unaccessed hardware prefetch. */
     bool _prefetched = 0;
+
+    /** Accessed bytes in the cache block. */
+    uint64_t _accessMask = 0;
 };
 
 /**

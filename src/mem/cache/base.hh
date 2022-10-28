@@ -77,6 +77,17 @@
 #include "sim/sim_exit.hh"
 #include "sim/system.hh"
 
+/* Helper function to count ones in a binary number */
+template<typename T>
+unsigned int countOnes(T v) {
+    unsigned int c;
+    v = v - ((v >> 1) & (T)~(T)0/3);                           // temp
+    v = (v & (T)~(T)0/15*3) + ((v >> 2) & (T)~(T)0/15*3);      // temp
+    v = (v + (v >> 4)) & (T)~(T)0/255*15;                      // temp
+    c = (T)(v * ((T)~(T)0/255)) >> (sizeof(T) - 1) * CHAR_BIT; // count
+    return c;
+}
+
 namespace gem5
 {
 
@@ -1350,6 +1361,9 @@ class BaseCache : public ClockedObject
          * factor improved).
          */
         statistics::Scalar dataContractions;
+
+        /* Distribution of accessed bytes in blocks before eviction */
+        statistics::Vector accessedBytes;
 
         /* Number of ticks (i) banks are used concurrently */
         statistics::Vector concurrentBanksTicks;
