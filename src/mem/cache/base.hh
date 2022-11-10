@@ -470,6 +470,9 @@ class BaseCache : public ClockedObject
 
   protected:
 
+    /* Access trace file stream */
+    std::ofstream trace;
+
     /* Data array banks */
     std::vector<Bank *> banks;
 
@@ -1112,6 +1115,9 @@ class BaseCache : public ClockedObject
 
     /* Avoid sender paralysis on bank conflict */
     const bool cflDelay;
+
+    /* Dump cache access trace */
+    const bool dumpAccessTrace;
 
     /* Stores the number of blocked banks */
     unsigned bankBlockedNum;
