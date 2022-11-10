@@ -94,6 +94,8 @@ class BaseCache(ClockedObject):
         "Allow to check tags even if the bank is blocked")
     cfl_delay = Param.Bool(True, "Avoid sender paralysis on bank conflict")
 
+    dump_access_trace = Param.Bool(False, "Dump cache access trace")
+
     warmup_percentage = Param.Percent(0,
         "Percentage of tags to be touched to warm up the cache")
 

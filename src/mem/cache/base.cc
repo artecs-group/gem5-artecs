@@ -45,6 +45,9 @@
 
 #include "mem/cache/base.hh"
 
+#include <iomanip>
+#include <iostream>
+
 #include "base/compiler.hh"
 #include "base/logging.hh"
 #include "debug/Cache.hh"
@@ -66,6 +69,18 @@
 #include "sim/core.hh"
 #include "sim/cur_tick.hh"
 #include "sim/stats.hh"
+
+/* Helper function to print binary values as hex */
+void printToHex(std::ofstream& stream, const void *data, size_t size) {
+    stream << "0x";
+    const uint8_t *buf = static_cast<const uint8_t *>(data);
+    std::ios_base::fmtflags f(stream.flags());
+    for (size_t i = 0; i < size; i++) {
+        stream << std::uppercase << std::hex << std::setfill('0')
+               << std::setw(2) << (static_cast<int>(buf[size-i-1]) & 0xFF);
+    }
+    stream.flags(f);
+}
 
 namespace gem5
 {
@@ -112,6 +127,7 @@ BaseCache::BaseCache(const BaseCacheParams &p, unsigned blk_size)
       bankIntlvMask(((1ULL << bankIntlvBits) - 1 ) << bankIntlvLowBit),
       unlockedTags(p.unlocked_tags),
       cflDelay(p.cfl_delay),
+      dumpAccessTrace(p.dump_access_trace),
       bankBlockedNum(0),
       bankLastEvent(0),
       sequentialAccess(p.sequential_access),
@@ -165,6 +181,15 @@ BaseCache::BaseCache(const BaseCacheParams &p, unsigned blk_size)
         for (unsigned i = 0; i < banks.size(); ++i) {
             banks[i] = new Bank(csprintf("%s.bank_%d", p.name, i), this);
         }
+    }
+
+    if (dumpAccessTrace) {
+        trace.open(p.name + ".trace.csv");
+        trace << "cycle,"
+              << "paddr,"
+              << "data,"
+              << "type"
+              << std::endl;
     }
 }
 
@@ -612,6 +637,20 @@ BaseCache::recvTimingReq(PacketPtr pkt)
                 ticksToCycles(access_time - curTick());
         }
 
+        if (data_access != None && dumpAccessTrace) {
+            trace << curCycle() << ",";
+            Addr pkt_addr = pkt->getAddr();
+            printToHex(trace, &pkt_addr, 8);
+            trace << ",";
+            if (pkt->isWrite()) {
+                printToHex(trace, pkt->getConstPtr<void>(), pkt->getSize());
+                trace << ",W";
+            } else {
+                trace << "0,R";
+            }
+            trace << std::endl;
+        }
+
         handleTimingReqHit(pkt, blk, request_time);
     } else {
         handleTimingReqMiss(pkt, blk, forward_time, request_time);
@@ -770,6 +809,16 @@ BaseCache::recvTimingResp(PacketPtr pkt)
                 request_time - curTick();
             stats.bankBlockedCycles[bank_id][requestor_id] +=
                 ticksToCycles(request_time - curTick());
+        }
+
+        if (!pkt->isUpgrade() && blk != tempBlock && dumpAccessTrace) {
+            trace << curCycle() << ",";
+            Addr pkt_addr = pkt->getAddr();
+            printToHex(trace, &pkt_addr, 8);
+            trace << ",";
+            printToHex(trace, pkt->getConstPtr<void>(), pkt->getSize());
+            trace << ",W";
+            trace << std::endl;
         }
     }
 
