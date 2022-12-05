@@ -125,7 +125,7 @@ def main():
 
     # Write the magic number in 4-byte Little Endian, similar to what
     # is done in src/proto/protoio.cc
-    proto_out.write("gem5")
+    proto_out.write("gem5".encode())
 
     # Add the packet header
     header = inst_dep_record_pb2.InstDepRecordHeader()
