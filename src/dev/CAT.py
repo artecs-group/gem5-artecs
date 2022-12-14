@@ -1,6 +1,4 @@
-# -*- mode:python -*-
-
-# Copyright (c) 2006 The Regents of The University of Michigan
+# Copyright (c) 2005-2007 The Regents of The University of Michigan
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -26,39 +24,14 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-Import('*')
+from m5.params import *
+from m5.objects.Device import BasicPioDevice
 
-SimObject('Device.py', sim_objects=[
-    'PioDevice', 'BasicPioDevice', 'DmaDevice', 'DmaVirtDevice', 'IsaFake'])
-Source('io_device.cc')
-Source('isa_fake.cc')
-Source('dma_device.cc')
-Source('dma_virt_device.cc')
-
-SimObject('IntPin.py', sim_objects=[])
-Source('intpin.cc')
-
-DebugFlag('IsaFake')
-DebugFlag('DMA')
-
-SimObject('Platform.py', sim_objects=['Platform'])
-Source('platform.cc')
-
-if env['TARGET_ISA'] == 'null':
-    Return()
-
-SimObject('BadDevice.py', sim_objects=['BadDevice'])
-
-Source('baddev.cc')
-Source('intel_8254_timer.cc')
-Source('mc146818.cc')
-Source('pixelpump.cc')
-
-DebugFlag('Intel8254Timer')
-DebugFlag('MC146818')
-
-SimObject('CAT.py', sim_objects=['CAT'])
-Source('cat.cc')
-DebugFlag('CAT')
-
-GTest('reg_bank.test', 'reg_bank.test.cc')
+class CAT(BasicPioDevice):
+    type = 'CAT'
+    cxx_header = "dev/cat.hh"
+    cxx_class  = 'gem5::CAT'
+    entries    = Param.Int(8, "Number of CAT entries")
+    config_lat = Param.Cycles(1, "Configuration latency (cycles)")
+    start_lat  = Param.Cycles(4, "Translation start latency (cycles)")
+    lookup_lat = Param.Cycles(0, "Address lookup latency (cycles)")
