@@ -204,11 +204,13 @@ class BaseCPU(ClockedObject):
         self.connectAllPorts(bus.cpu_side_ports,
             bus.cpu_side_ports, bus.mem_side_ports)
 
-    def addPrivateSplitL1Caches(self, ic, dc, iwc = None, dwc = None):
+    def addPrivateSplitL1Caches(self, ic, dc, iwc = None, dwc = None,
+                                skip_dcache_port = False):
         self.icache = ic
         self.dcache = dc
         self.icache_port = ic.cpu_side
-        self.dcache_port = dc.cpu_side
+        if not skip_dcache_port:
+            self.dcache_port = dc.cpu_side
         self._cached_ports = ['icache.mem_side', 'dcache.mem_side']
         if iwc and dwc:
             self.itb_walker_cache = iwc

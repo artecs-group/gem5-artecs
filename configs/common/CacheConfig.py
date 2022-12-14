@@ -113,7 +113,7 @@ def _get_cache_opts(level, options):
 
     return opts
 
-def config_cache(options, system):
+def config_cache(options, system, skip_dcache_port = False):
     if options.external_memory_system and (options.caches or options.l2cache):
         print("External caches and internal caches are exclusive options.\n")
         sys.exit(1)
@@ -236,7 +236,8 @@ def config_cache(options, system):
             # When connecting the caches, the clock is also inherited
             # from the CPU in question
             system.cpu[i].addPrivateSplitL1Caches(icache, dcache,
-                                                  iwalkcache, dwalkcache)
+                                                  iwalkcache, dwalkcache,
+                                                  skip_dcache_port)
 
             if options.memchecker:
                 # The mem_side ports of the caches haven't been connected yet.

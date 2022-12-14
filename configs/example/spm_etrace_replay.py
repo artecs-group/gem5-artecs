@@ -48,23 +48,21 @@ from common import MemConfig
 from common.Caches import *
 
 def addSPMOptions(parser):
-    """parser.add_argument("--scratchpad-size", type=str,
-                           default="4kB")"""
-    parser.add_argument("--scratchpad-read-latency", type=str,
-                        default="1ns")
-    """parser.add_argument("--scratchpad-write-latency", type=str,
-                           default="1ns")"""
-    parser.add_argument("--scratchpad-bandwidth", type=str,
-                        default='64GB/s')
+    parser.add_argument("--spm1-read-latency", type=str,
+                        default="2")
+    parser.add_argument("--spm1-write-latency", type=str,
+                        default="2")
+
 
 def buildSPM(args, cpuid):
-    scratchpad = SimpleMemory()
+    scratchpad = Scratchpad()
     spm_size  = MemorySize(args.mem_size)
     spm_start = MemorySize(args.mem_size).getValue() + (
         spm_size.getValue() * cpuid)
     scratchpad.range = AddrRange(spm_start, size = spm_size)
-    scratchpad.latency = Latency(args.scratchpad_read_latency)
-    scratchpad.bandwidth = MemoryBandwidth(args.scratchpad_bandwidth)
+    scratchpad.read_latency = Latency(args.spm1_read_latency)
+    scratchpad.write_latency = Latency(args.spm1_write_latency)
+    scratchpad.banks_enable = False
     return scratchpad
 
 parser = argparse.ArgumentParser()
@@ -85,7 +83,10 @@ if args.cpu_type != "TraceCPU":
             "--cpu-type=TraceCPU\n");
 
 if args.num_cpus > 1:
-    fatal("This script does not support multi-processor trace replay.\n")
+    fatal("This script does not support multi-processor trace replay\n")
+
+if not args.caches:
+    fatal("Caches must be used with this script\n")
 
 # In this case FutureClass will be None as there is not fast forwarding or
 # switching
@@ -128,69 +129,24 @@ for cpu in system.cpu:
 system.cpu.instTraceFile=args.inst_trace_file
 system.cpu.dataTraceFile=args.data_trace_file
 
-# Configure the classic memory system args
 MemClass = Simulation.setMemClass(args)
-system.cache_line_size = args.cacheline_size
-# L1D-SPM Hub
-system.hub = NoncoherentXBar()
-system.hub.width = 8
-system.hub.frontend_latency = 1
-system.hub.forward_latency  = 0
-system.hub.response_latency = 0
-system.cpu.icache = L1_ICache()
-system.cpu.dcache = L1_DCache()
-# L1 Cache Parameters
-system.cpu.dcache.size = args.l1d_size
-system.cpu.icache.size = args.l1i_size
-system.cpu.dcache.assoc = args.l1d_assoc
-system.cpu.icache.assoc = args.l1i_assoc
-system.cpu.dcache.data_latency = args.l1d_data_lat
-system.cpu.icache.data_latency = args.l1i_data_lat
-system.cpu.dcache.write_latency = args.l1d_write_lat
-system.cpu.icache.write_latency = args.l1i_write_lat
-system.cpu.dcache.tag_latency = args.l1d_tag_lat
-system.cpu.icache.tag_latency = args.l1i_tag_lat
-system.cpu.dcache.response_latency = args.l1d_resp_lat
-system.cpu.icache.response_latency = args.l1i_resp_lat
-system.cpu.dcache.enable_banks = args.l1d_enable_banks
-system.cpu.icache.enable_banks = args.l1i_enable_banks
-system.cpu.dcache.num_banks = args.l1d_num_banks
-system.cpu.icache.num_banks = args.l1i_num_banks
-system.cpu.dcache.bank_intlv_high_bit = args.l1d_intlv_bit
-system.cpu.icache.bank_intlv_high_bit = args.l1i_intlv_bit
-system.cpu.dcache.addr_ranges = [AddrRange(0, args.mem_size)]
-system.cpu.dcache_port = system.hub.cpu_side_ports
-system.cpu.icache.cpu_side = system.cpu.icache_port
-# L2 Bus
-system.l2bus = L2XBar()
-system.cpu.icache.mem_side = system.l2bus.cpu_side_ports
-system.cpu.dcache.mem_side = system.l2bus.cpu_side_ports
-system.l2cache = L2Cache()
-system.l2cache.cpu_side = system.l2bus.mem_side_ports
-# L2 Cache Parameters
-system.l2cache.size = args.l2_size
-system.l2cache.assoc = args.l2_assoc
-system.l2cache.data_latency = args.l2_data_lat
-system.l2cache.write_latency = args.l2_write_lat
-system.l2cache.tag_latency = args.l2_tag_lat
-system.l2cache.response_latency = args.l2_resp_lat
-system.l2cache.enable_banks = args.l2_enable_banks
-system.l2cache.num_banks = args.l2_num_banks
-system.l2cache.bank_intlv_high_bit = args.l2_intlv_bit
 system.membus = SystemXBar()
-system.l2cache.mem_side = system.membus.cpu_side_ports
-# SPM Definition
+system.system_port = system.membus.cpu_side_ports
+CacheConfig.config_cache(args, system, True)
+MemConfig.config_mem(args, system)
+
+# Override dcache address range
+system.cpu.dcache.addr_ranges = [AddrRange(0, args.mem_size)]
+
+# SPM-related configuration
+system.translator = CAT(pio_addr = 0x20000000000)
+system.hub = TranslatingXBar(width = 8,
+                             translator_port = system.translator.pio)
 system.scratchpad = buildSPM(args, 0)
+system.mem_ranges.append(system.scratchpad.range)
 system.hub.mem_side_ports = [system.scratchpad.port,
                              system.cpu.dcache.cpu_side]
-system.cpu.createInterruptController()
-if buildEnv['TARGET_ISA'] == "x86":
-    system.cpu.interrupts[0].pio = system.membus.mem_side_ports
-    system.cpu.interrupts[0].int_requestor = system.membus.cpu_side_ports
-    system.cpu.interrupts[0].int_responder = system.membus.mem_side_ports
-
-system.system_port = system.membus.cpu_side_ports
-MemConfig.config_mem(args, system)
+system.hub.cpu_side_ports = system.cpu.dcache_port
 
 root = Root(full_system = False, system = system)
 Simulation.run(args, root, system, FutureClass)
