@@ -213,3 +213,16 @@ class IOXBar(NoncoherentXBar):
     frontend_latency = 2
     forward_latency = 1
     response_latency = 2
+
+class TranslatingXBar(BaseXBar):
+    type = 'TranslatingXBar'
+    cxx_header = "mem/translating_xbar.hh"
+    cxx_class = 'gem5::TranslatingXBar'
+
+    width = 64
+    header_latency   = 0
+    frontend_latency = 0
+    forward_latency  = 0
+    response_latency = 0
+
+    translator_port = RequestPort("Port for connecting the address translator")
