@@ -26,12 +26,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "dev/cat.hh"
+#include "dev/cat_translator.hh"
 
 #include "base/trace.hh"
-#include "debug/CAT.hh"
 #include "mem/packet_access.hh"
-#include "params/CAT.hh"
 
 namespace gem5
 {

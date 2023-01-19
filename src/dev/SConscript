@@ -57,8 +57,8 @@ Source('pixelpump.cc')
 DebugFlag('Intel8254Timer')
 DebugFlag('MC146818')
 
-SimObject('CAT.py', sim_objects=['CAT'])
-Source('cat.cc')
+SimObject('CatTranslator.py', sim_objects=['CAT'])
+Source('cat_translator.cc')
 DebugFlag('CAT')
 
 GTest('reg_bank.test', 'reg_bank.test.cc')
