@@ -105,10 +105,10 @@ class CAT : public BasicPioDevice, CatCmdInterface
     std::vector<range_t> ranges;
 
     /* Response register */
-    uint64_t response;
+    uint64_t responseReg;
 
     /* Ready time register */
-    uint64_t ready_reg;
+    uint64_t readyTimeReg;
 
     /* Get the entry ID of a request */
     uint8_t getEntryID(uint64_t req) const {

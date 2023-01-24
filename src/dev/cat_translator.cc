@@ -12,13 +12,14 @@ CAT::CAT(const Params &params) :
     startLat(params.start_lat),
     lookupLat(params.lookup_lat),
     entries(params.entries),
-    response(0)
+    responseReg(0),
+    readyTimeReg(0)
 { }
 
 void
 CAT::lookup(Addr addr)
 {
-    response = 0;
+    responseReg = 0;
 
     // First lookup: check if address is in a mapped range
     auto it = std::find_if (
@@ -32,13 +33,13 @@ CAT::lookup(Addr addr)
                 "entry %d\n", addr, 0);
         uint8_t entry_id = it->entry_id;
         std::map<Addr, Addr>& lut = entries[entry_id].lut;
-        ready_reg = entries[entry_id].ready_time;
+        readyTimeReg = entries[entry_id].ready_time;
 
         // Second lookup: check if there is an entry in the LUT
         auto ait = lut.find(addr);
         if (ait != lut.end()) {
             DPRINTF(CAT, "Address found in LUT, returning new address\n");
-            response = ait->second;
+            responseReg = ait->second;
             setStatus(CAT_FOUND);
         } else {
             DPRINTF(CAT, "Address not found in LUT, won't translate\n");
@@ -75,8 +76,8 @@ CAT::setStatus(status_t status)
         value = 0b0000;
         break;
     }
-    response &= ~((uint64_t)0b1111 << 40);
-    response |=  ((uint64_t)value  << 40);
+    responseReg &= ~((uint64_t)0b1111 << 40);
+    responseReg |=  ((uint64_t)value  << 40);
 }
 
 void
@@ -183,11 +184,11 @@ CAT::CATRegRead(Addr addr, Tick &delay)
         panic("CAT_REQ_REG is write-only!");
         break;
       case CAT_RESP_REG:
-        r = response;
+        r = responseReg;
         DPRINTF(CAT, "Reading CAT_RESP_REG: %#x\n", r);
         break;
       case CAT_RDY_REG:
-        r = ready_reg;
+        r = readyTimeReg;
         DPRINTF(CAT, "Reading CAT_RDY_REG: %#x\n", r);
         break;
       default:
