@@ -10,7 +10,7 @@
  *
  * Table of commands: see cat_cmd_interface.hh
  *
- * Description of CAT_REQ_RESP:
+ * Description of CAT_RESP_REG:
  * 43       39        0
  * +========+=========+
  * | STATUS | ADDRESS |
