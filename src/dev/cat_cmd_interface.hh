@@ -30,13 +30,14 @@
 #ifndef __DEV_CAT_COMMON_HH__
 #define __DEV_CAT_COMMON_HH__
 
+#include "base/types.hh"
+
 namespace gem5
 {
 
 class CatCmdInterface
 {
   protected:
-
     /* Request commands */
     enum cmd_t
     {
@@ -67,71 +68,39 @@ class CatCmdInterface
         CAT_INTLV_D3
     };
 
-    /* Decode the command of a request */
-    cmd_t decodeCmd(uint64_t req) const {
-        cmd_t cmd;
-        switch ((req >> 48) & 0x1f) {
-          case 0b11000:
-            cmd = CAT_SET_ST_ADDR;
-            break;
-          case 0b11001:
-            cmd = CAT_SET_INTLV_D2;
-            break;
-          case 0b11010:
-            cmd = CAT_SET_INTLV_D3;
-            break;
-          case 0b11011:
-            cmd = CAT_SET_OLOOP;
-            break;
-          case 0b11100:
-            cmd = CAT_SET_STR_MODE;
-            break;
-          case 0b11101:
-            cmd = CAT_SET_TR_B_ADDR;
-            break;
-          case 0b11111:
-            cmd = CAT_START_STOP;
-            break;
-          default:
-            cmd = CAT_NO_COMMAND;
-        }
-        return cmd;
+    /* Translation parameters */
+    struct params_t
+    {
+        Addr     start_addr = 0;          // Start address
+        int16_t  seq_stride = 0;          // Sequential stride
+        int16_t  iv2_stride = 0;          // Interleave 2 stride
+        int16_t  iv2_offset = 0;          // Interleave 2 offset
+        int16_t  iv3_stride = 0;          // Interleave 3 stride
+        int16_t  iv3_offset = 0;          // Interleave 3 offset
+        int16_t  ol_offset  = 0;          // Outer loop offset
+        uint16_t ol_length  = 0;          // Outer loop length
+        uint16_t length     = 0;          // Interval length
+        Addr     tr_b_addr  = 0;          // Translated base address
+        opmode_t mode = CAT_MOD_UNKNOWN;  // Operation mode
     };
+
+    /* Decode the command of a request */
+    cmd_t decodeCmd(uint64_t req) const;
 
     /* Decode the subcommand of a CAT_START_STOP request */
-    subcmd_t decodeStartStop(uint64_t req) const {
-        subcmd_t subcmd;
-        switch (req & 0xff) {
-          case 0b10100101:
-            subcmd = CAT_SUB_START;
-            break;
-          case 0b01011010:
-            subcmd = CAT_SUB_STOP;
-            break;
-          default:
-            subcmd = CAT_SUB_UNKNOWN;
-        }
-        return subcmd;
-    };
+    subcmd_t decodeStartStop(uint64_t req) const;
 
     /* Decode the operation mode of a CAT_SET_STR_MODE request */
-    opmode_t decodeMode(uint64_t req) const {
-        opmode_t opmode;
-        switch ((req >> 16) & 0xf) {
-          case 0b1100:
-            opmode = CAT_SEQUENTIAL;
-            break;
-          case 0b1101:
-            opmode = CAT_INTLV_D2;
-            break;
-          case 0b1111:
-            opmode = CAT_INTLV_D3;
-            break;
-          default:
-            opmode = CAT_MOD_UNKNOWN;
-        }
-        return opmode;
-    }
+    opmode_t decodeMode(uint64_t req) const;
+
+    /* Get the payload of a request */
+    uint64_t getPayload(uint64_t req) const;
+
+    /* Set parameters according to received request */
+    bool setParams(uint64_t req, params_t &p, std::string &cmd_name);
+
+    /* Protected constructor */
+    CatCmdInterface() { };
 };
 
 } // namespace gem5

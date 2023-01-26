@@ -58,6 +58,7 @@ DebugFlag('Intel8254Timer')
 DebugFlag('MC146818')
 
 SimObject('CatTranslator.py', sim_objects=['CAT'])
+Source('cat_cmd_interface.cc')
 Source('cat_translator.cc')
 DebugFlag('CAT')
 

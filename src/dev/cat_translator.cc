@@ -1,6 +1,7 @@
 #include "dev/cat_translator.hh"
 
 #include "base/trace.hh"
+#include "debug/CAT.hh"
 #include "mem/packet_access.hh"
 
 namespace gem5
@@ -15,6 +16,40 @@ CAT::CAT(const Params &params) :
     responseReg(0),
     readyTimeReg(0)
 { }
+
+uint8_t
+CAT::getEntryID(uint64_t req) const
+{
+    return (uint8_t)((req >> 53) & 0xff);
+}
+
+void
+CAT::setStatus(status_t status)
+{
+    uint8_t value;
+    switch (status) {
+      case CAT_NOT_MAPPED:
+        value = 0b0000;
+        break;
+      case CAT_CMD_ACK:
+        value = 0b0101;
+        break;
+      case CAT_CMD_NACK:
+        value = 0b1001;
+        break;
+      case CAT_NOT_FOUND:
+        value = 0b1010;
+        break;
+      case CAT_FOUND:
+        value = 0b1111;
+        break;
+      default:
+        value = 0b0000;
+        break;
+    }
+    responseReg &= ~((uint64_t)0b1111 << 40);
+    responseReg |=  ((uint64_t)value  << 40);
+}
 
 void
 CAT::lookup(Addr addr)
@@ -53,54 +88,26 @@ CAT::lookup(Addr addr)
 }
 
 void
-CAT::setStatus(status_t status)
-{
-    uint8_t value;
-    switch (status) {
-      case CAT_NOT_MAPPED:
-        value = 0b0000;
-        break;
-      case CAT_CMD_ACK:
-        value = 0b0101;
-        break;
-      case CAT_CMD_NACK:
-        value = 0b1001;
-        break;
-      case CAT_NOT_FOUND:
-        value = 0b1010;
-        break;
-      case CAT_FOUND:
-        value = 0b1111;
-        break;
-      default:
-        value = 0b0000;
-        break;
-    }
-    responseReg &= ~((uint64_t)0b1111 << 40);
-    responseReg |=  ((uint64_t)value  << 40);
-}
-
-void
 CAT::startTranslation(uint8_t entry_id) {
     entry_t& tgt = entries[entry_id];
 
-    std::array<int16_t, 3> strides = { tgt.seq_stride,
-                                       tgt.iv2_stride,
-                                       tgt.iv3_stride };
-    std::array<Addr, 3> start_addr = { tgt.start_addr,
-                                       tgt.start_addr + tgt.iv2_offset,
-                                       tgt.start_addr + tgt.iv3_offset };
+    std::array<int16_t, 3> strides = { tgt.p.seq_stride,
+                                       tgt.p.iv2_stride,
+                                       tgt.p.iv3_stride };
+    std::array<Addr, 3> start_addr = { tgt.p.start_addr,
+                                       tgt.p.start_addr + tgt.p.iv2_offset,
+                                       tgt.p.start_addr + tgt.p.iv3_offset };
     std::array<Addr, 3> cur_addr = start_addr;
-    Addr out_addr = tgt.tr_b_addr;
+    Addr out_addr = tgt.p.tr_b_addr;
 
-    uint16_t length = tgt.length;
+    uint16_t length = tgt.p.length;
     if (!length) {
         panic("The length of the interval must not be 0!");
         return;
     }
 
     uint8_t intlv = 0;
-    switch (tgt.mode) {
+    switch (tgt.p.mode) {
       case CAT_SEQUENTIAL:
         intlv = 1;
         break;
@@ -115,7 +122,7 @@ CAT::startTranslation(uint8_t entry_id) {
         panic("Specified mode is not valid!");
         break;
     }
-    uint16_t ol_length = (tgt.ol_length < 1 ? 1 : tgt.ol_length);
+    uint16_t ol_length = (tgt.p.ol_length < 1 ? 1 : tgt.p.ol_length);
 
     /* Create the LUT with every possible combination of addresses */
     for (uint16_t ol_iter = 0; ol_iter < ol_length; ol_iter++) {
@@ -134,7 +141,7 @@ CAT::startTranslation(uint8_t entry_id) {
         }
         // End of inner loop, add outer loop offset
         for (uint8_t i = 0; i < intlv; i++) {
-            start_addr[i] = int64_t(start_addr[i]) + tgt.ol_offset;
+            start_addr[i] = int64_t(start_addr[i]) + tgt.p.ol_offset;
         }
         cur_addr = start_addr;
     }
@@ -221,11 +228,19 @@ CAT::CATRegWrite(Addr addr, uint64_t data, Tick &delay)
         return;
     }
 
-    cmd_t    cmd     = decodeCmd(data);
     uint8_t  entry   = getEntryID(data);
+    cmd_t    cmd     = decodeCmd(data);
     uint64_t payload = getPayload(data);
 
     delay = cyclesToTicks(configLat);
+
+    std::string cmd_name = "CMD_UNKNOWN";
+    bool success = setParams(data, entries[entry].p, cmd_name);
+    if (success) {
+        DPRINTF(CAT, "Received command CAT_%s, entry %d\n", cmd_name, entry);
+        setStatus(CAT_CMD_ACK);
+        return;
+    }
 
     switch(cmd) {
       case CAT_NO_COMMAND:
@@ -233,47 +248,6 @@ CAT::CATRegWrite(Addr addr, uint64_t data, Tick &delay)
         lookup((Addr)payload);
         // Warning: lookup latency is ignored for now: using functional access
         delay = cyclesToTicks(lookupLat);
-        break;
-
-      case CAT_SET_ST_ADDR:
-        DPRINTF(CAT, "Received command CAT_SET_ST_ADDR, entry %d\n", entry);
-        entries[entry].start_addr = (Addr)payload;
-        setStatus(CAT_CMD_ACK);
-        break;
-
-      case CAT_SET_INTLV_D2:
-        DPRINTF(CAT, "Received command CAT_SET_INTLV_D2, entry %d\n", entry);
-        entries[entry].iv2_stride = (payload >> 16) & 0xffff;
-        entries[entry].iv2_offset = payload & 0xffff;
-        setStatus(CAT_CMD_ACK);
-        break;
-
-      case CAT_SET_INTLV_D3:
-        DPRINTF(CAT, "Received command CAT_SET_INTLV_D3, entry %d\n", entry);
-        entries[entry].iv3_stride = (payload >> 16) & 0xffff;
-        entries[entry].iv3_offset = payload & 0xffff;
-        setStatus(CAT_CMD_ACK);
-        break;
-
-      case CAT_SET_OLOOP:
-        DPRINTF(CAT, "Received command CAT_SET_OLOOP, entry %d\n", entry);
-        entries[entry].ol_offset  = (payload >> 16) & 0xffff;
-        entries[entry].ol_length  = payload & 0xffff;
-        setStatus(CAT_CMD_ACK);
-        break;
-
-      case CAT_SET_STR_MODE:
-        DPRINTF(CAT, "Received command CAT_SET_STR_MODE, entry %d\n", entry);
-        entries[entry].seq_stride = (payload >> 32) & 0xffff;
-        entries[entry].mode       = decodeMode(payload);
-        entries[entry].length     = payload & 0xffff;
-        setStatus(CAT_CMD_ACK);
-        break;
-
-      case CAT_SET_TR_B_ADDR:
-        DPRINTF(CAT, "Received command CAT_SET_TR_B_ADDR, entry %d\n", entry);
-        entries[entry].tr_b_addr  = (Addr)payload;
-        setStatus(CAT_CMD_ACK);
         break;
 
       case CAT_START_STOP:
@@ -296,6 +270,12 @@ CAT::CATRegWrite(Addr addr, uint64_t data, Tick &delay)
             setStatus(CAT_CMD_NACK);
             break;
         }
+        break;
+
+      default:
+        panic("Command is invalid!");
+        setStatus(CAT_CMD_NACK);
+        break;
     }
 }
 

@@ -33,7 +33,6 @@
 #ifndef __DEV_CAT_HH__
 #define __DEV_CAT_HH__
 
-#include "debug/CAT.hh"
 #include "dev/cat_cmd_interface.hh"
 #include "dev/io_device.hh"
 #include "params/CAT.hh"
@@ -41,7 +40,7 @@
 namespace gem5
 {
 
-class CAT : public BasicPioDevice, CatCmdInterface
+class CAT : public BasicPioDevice, public CatCmdInterface
 {
   protected:
     const ByteOrder byteOrder = ByteOrder::little;
@@ -69,18 +68,8 @@ class CAT : public BasicPioDevice, CatCmdInterface
     /* Information contained in a CAT entry */
     struct entry_t
     {
-        Addr     start_addr = 0;          // Start address
-        int16_t  seq_stride = 0;          // Sequential stride
-        int16_t  iv2_stride = 0;          // Interleave 2 stride
-        int16_t  iv2_offset = 0;          // Interleave 2 offset
-        int16_t  iv3_stride = 0;          // Interleave 3 stride
-        int16_t  iv3_offset = 0;          // Interleave 3 offset
-        int16_t  ol_offset  = 0;          // Outer loop offset
-        uint16_t ol_length  = 0;          // Outer loop length
-        uint16_t length     = 0;          // Interval length
-        Addr     tr_b_addr  = 0;          // Translated base address
-        Tick     ready_time = 0;          // Ready time
-        opmode_t mode = CAT_MOD_UNKNOWN;  // Operation mode
+        params_t p;                       // Translation parameters
+        Tick ready_time = 0;              // Ready time
         std::map<Addr, Addr> lut;         // Translation LUT
     };
 
@@ -111,14 +100,10 @@ class CAT : public BasicPioDevice, CatCmdInterface
     uint64_t readyTimeReg;
 
     /* Get the entry ID of a request */
-    uint8_t getEntryID(uint64_t req) const {
-        return (uint8_t)((req >> 53) & 0xff);
-    };
+    uint8_t getEntryID(uint64_t req) const;
 
-    /* Get the payload of a request */
-    uint64_t getPayload(uint64_t req) const {
-        return req & 0xffffffffffff;
-    }
+    /* Sets the status to the response register */
+    void setStatus(status_t status);
 
     /**
      * Method to perform an address lookup
@@ -127,9 +112,6 @@ class CAT : public BasicPioDevice, CatCmdInterface
      * saved in the response register.
      */
     void lookup(uint64_t reg);
-
-    /* Sets the status to the response register */
-    void setStatus(status_t status);
 
     /**
      * Method to start the address translation
