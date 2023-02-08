@@ -278,84 +278,13 @@ SgaDmaPort::trySendTimingReq()
 bool
 SgaDmaPort::sendAtomicReq(SgaDmaReqState *state)
 {
-    PacketPtr pkt = state->createPacket();
-    DPRINTF(DMA, "Sending  DMA for addr: %#x size: %d\n",
-            state->gen.addr(), state->gen.size());
-    Tick lat = sendAtomic(pkt);
-
-    // Check if we're done, since handleResp may delete state.
-    bool done = !state->gen.next();
-    handleRespPacket(pkt, lat);
-    return done;
+    panic("Only timing mode is supported");
 }
 
 bool
 SgaDmaPort::sendAtomicBdReq(SgaDmaReqState *state)
 {
-    bool done = false;
-
-    auto bd_it = memBackdoors.contains(state->gen.addr());
-    if (bd_it == memBackdoors.end()) {
-        // We don't have a backdoor for this address, so use a packet.
-
-        PacketPtr pkt = state->createPacket();
-        DPRINTF(DMA, "Sending DMA for addr: %#x size: %d\n",
-                state->gen.addr(), state->gen.size());
-
-        MemBackdoorPtr bd = nullptr;
-        Tick lat = sendAtomicBackdoor(pkt, bd);
-
-        // If we got a backdoor, record it.
-        if (bd && memBackdoors.insert(bd->range(), bd) != memBackdoors.end()) {
-            // Invalidation callback which finds this backdoor and removes it.
-            auto callback = [this](const MemBackdoor &backdoor) {
-                for (auto it = memBackdoors.begin();
-                        it != memBackdoors.end(); it++) {
-                    if (it->second == &backdoor) {
-                        memBackdoors.erase(it);
-                        return;
-                    }
-                }
-                panic("Got invalidation for unknown memory backdoor.");
-            };
-            bd->addInvalidationCallback(callback);
-        }
-
-        // Check if we're done now, since handleResp may delete state.
-        done = !state->gen.next();
-        handleRespPacket(pkt, lat);
-    } else {
-        // We have a backdoor that can at least partially satisfy this request.
-        DPRINTF(DMA, "Handling DMA for addr: %#x size %d through backdoor\n",
-                state->gen.addr(), state->gen.size());
-
-        const auto *bd = bd_it->second;
-        // Offset of this access into the backdoor.
-        const Addr offset = state->gen.addr() - bd->range().start();
-        // How many bytes we still need.
-        const Addr remaining = state->totBytes - state->gen.complete();
-        // How many bytes this backdoor can provide, starting from offset.
-        const Addr available = bd->range().size() - offset;
-
-        // How many bytes we're going to handle through this backdoor.
-        const Addr handled = std::min(remaining, available);
-
-        // If there's a buffer for data, write it.
-        if (state->data) {
-            uint8_t *bd_data = bd->ptr() + offset;
-            uint8_t *state_data = state->data + state->gen.complete();
-            memcpy(state_data, bd_data, handled);
-        }
-
-        // Advance the chunk generator past this region of memory.
-        state->gen.setNext(state->gen.addr() + handled);
-
-        // Check if we're done now, since handleResp may delete state.
-        done = !state->gen.next();
-        handleResp(state, state->gen.addr(), handled);
-    }
-
-    return done;
+    panic("Only timing mode is supported");
 }
 
 void
