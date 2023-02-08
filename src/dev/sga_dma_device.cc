@@ -450,24 +450,6 @@ SgaDmaReadFifo::unserialize(CheckpointIn &cp)
     UNSERIALIZE_SCALAR(dstAddr);
 }
 
-bool
-SgaDmaReadFifo::tryGet(uint8_t *dst, size_t len)
-{
-    if (buffer.size() >= len) {
-        buffer.read(dst, len);
-        resumeFill();
-        return true;
-    } else {
-        return false;
-    }
-}
-
-void
-SgaDmaReadFifo::get(uint8_t *dst, size_t len)
-{
-    panic_if(!tryGet(dst, len), "Buffer underrun in SgaDmaReadFifo::get()");
-}
-
 void
 SgaDmaReadFifo::startFill(Addr start, Addr dst, size_t size)
 {

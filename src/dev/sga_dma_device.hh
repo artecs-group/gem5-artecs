@@ -304,46 +304,6 @@ class SgaDmaReadFifo : public Drainable, public Serializable
      * @{
      * @name FIFO access
      */
-    /**
-     * Try to read data from the FIFO.
-     *
-     * This method reads len bytes of data from the FIFO and stores
-     * them in the memory location pointed to by dst. The method
-     * fails, and no data is written to the buffer, if the FIFO
-     * doesn't contain enough data to satisfy the request.
-     *
-     * @param dst Pointer to a destination buffer
-     * @param len Amount of data to read.
-     * @return true on success, false otherwise.
-     */
-    bool tryGet(uint8_t *dst, size_t len);
-
-    template<typename T>
-    bool
-    tryGet(T &value)
-    {
-        return tryGet(static_cast<T *>(&value), sizeof(T));
-    };
-
-    /**
-     * Read data from the FIFO and panic on failure.
-     *
-     * @see tryGet()
-     *
-     * @param dst Pointer to a destination buffer
-     * @param len Amount of data to read.
-     */
-    void get(uint8_t *dst, size_t len);
-
-    template<typename T>
-    T
-    get()
-    {
-        T value;
-        get(static_cast<uint8_t *>(&value), sizeof(T));
-        return value;
-    };
-
     /** Get the amount of data stored in the FIFO */
     size_t size() const { return buffer.size(); }
     /** Flush the FIFO */
