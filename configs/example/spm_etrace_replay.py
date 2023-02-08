@@ -139,14 +139,17 @@ MemConfig.config_mem(args, system)
 system.cpu.dcache.addr_ranges = [AddrRange(0, args.mem_size)]
 
 # SPM-related configuration
-system.translator = CAT(pio_addr = 0x20000000000)
+system.translator = CAT(pio_addr = 0x2000000000)
+system.dmac = SgaDmaController(pio_addr = 0x3000000000)
 system.hub = TranslatingXBar(width = 8,
-                             translator_port = system.translator.pio)
+                             translator_port = system.translator.pio,
+                             dmac_port = system.dmac.pio)
 system.scratchpad = buildSPM(args, 0)
 system.mem_ranges.append(system.scratchpad.range)
 system.hub.mem_side_ports = [system.scratchpad.port,
                              system.cpu.dcache.cpu_side]
-system.hub.cpu_side_ports = system.cpu.dcache_port
+system.hub.cpu_side_ports = [system.dmac.dma,
+                             system.cpu.dcache_port]
 
 root = Root(full_system = False, system = system)
 Simulation.run(args, root, system, FutureClass)

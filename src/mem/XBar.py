@@ -226,3 +226,4 @@ class TranslatingXBar(BaseXBar):
     response_latency = 0
 
     translator_port = RequestPort("Port for connecting the address translator")
+    dmac_port = RequestPort("Port for connecting the DMA controller")

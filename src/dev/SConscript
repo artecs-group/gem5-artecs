@@ -62,4 +62,9 @@ Source('cat_cmd_interface.cc')
 Source('cat_translator.cc')
 DebugFlag('CAT')
 
+SimObject('SgaDma.py', sim_objects=['SgaDmaDevice', 'SgaDmaController'])
+Source('sga_dma_device.cc')
+Source('sga_dma_controller.cc')
+DebugFlag('SGA_DMA')
+
 GTest('reg_bank.test', 'reg_bank.test.cc')

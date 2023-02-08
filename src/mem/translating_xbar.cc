@@ -80,14 +80,27 @@ TranslatingXBar::TranslatingXBar(const TranslatingXBarParams &p)
                                                               defaultPortID)));
     }
 
-    // create the translator port
-    translatorPortID = memSidePorts.size();
-    std::string portName = csprintf("%s.translator_port", name());
-    RequestPort* bp = new TranslatingXBarRequestPort(portName, *this,
-                                                     translatorPortID);
-    memSidePorts.push_back(bp);
-    reqLayers.push_back(new ReqLayer(*bp, *this, csprintf("reqLayer%d",
-                                                          translatorPortID)));
+    // create the address translator port
+    {
+        translatorPortID = memSidePorts.size();
+        std::string portName = csprintf("%s.translator_port", name());
+        RequestPort* bp = new TranslatingXBarRequestPort(portName, *this,
+                                                         translatorPortID);
+        memSidePorts.push_back(bp);
+        reqLayers.push_back(new ReqLayer(*bp, *this, csprintf("reqLayer%d",
+                                                     translatorPortID)));
+    }
+
+    // create the DMA controller port
+    {
+        dmacPortID = memSidePorts.size();
+        std::string portName = csprintf("%s.dmac_port", name());
+        RequestPort* bp = new TranslatingXBarRequestPort(portName, *this,
+                                                         dmacPortID);
+        memSidePorts.push_back(bp);
+        reqLayers.push_back(new ReqLayer(*bp, *this, csprintf("reqLayer%d",
+                                                              dmacPortID)));
+    }
 
     // create the CPU-side ports, once again starting at zero
     for (int i = 0; i < p.port_cpu_side_ports_connection_count; ++i) {
@@ -119,6 +132,8 @@ TranslatingXBar::getPort(const std::string &if_name, PortID idx)
         return *memSidePorts[defaultPortID];
     } else  if (if_name == "translator_port") {
         return *memSidePorts[translatorPortID];
+    } else  if (if_name == "dmac_port") {
+        return *memSidePorts[dmacPortID];
     } else if (if_name == "cpu_side_ports" && idx < cpuSidePorts.size()) {
         // the CPU-side ports index translates directly to the vector position
         return *cpuSidePorts[idx];
@@ -137,20 +152,29 @@ TranslatingXBar::recvTimingReq(PacketPtr pkt, PortID cpu_side_port_id)
     assert(!pkt->isExpressSnoop());
 
     // write request to addresses >= 2^61 are used to program the
-    // address translator. The address itself is used as data after
-    // clearing the first 3 bits. This workaround allows to program
-    // the translator when using elastic traces, which do not contain
-    // data
+    // address translator and dma controller. The address itself
+    // is used as data after clearing the first 3 bits. This workaround
+    // allows to program the translator when using elastic traces, which
+    // do not contain data
     Addr pkt_addr = pkt->getAddr();
-    AddrRangeList at_range =
+    AddrRangeList translator_range =
         memSidePorts[translatorPortID]->getAddrRanges();
-    Addr at_base_addr = at_range.front().start();
+    AddrRangeList dmac_range = memSidePorts[dmacPortID]->getAddrRanges();
+    Addr translator_base_addr = translator_range.front().start();
+    Addr dmac_base_addr = dmac_range.front().start();
 
-    if (pkt_addr >= 0x2000000000000000 && pkt->isWrite()) {
-        DPRINTF(TranslatingXBar, "Found CAT programming command\n");
+    uint8_t high_bits = pkt_addr >> 61;
+    if (high_bits && pkt->isWrite()) {
         uint64_t data = pkt_addr & 0x1fffffffffffffff;
-        pkt->setAddr(at_base_addr);
-        pkt->set(data, ByteOrder::little);
+        if (high_bits == 0b001) {
+            DPRINTF(TranslatingXBar, "Found translator programming command\n");
+            pkt->setAddr(translator_base_addr);
+            pkt->set(data, ByteOrder::little);
+        } else if (high_bits == 0b010) {
+            DPRINTF(TranslatingXBar, "Found DMAC programming command\n");
+            pkt->setAddr(dmac_base_addr);
+            pkt->set(data, ByteOrder::little);
+        }
     }
 
     // determine the destination based on the address
@@ -158,7 +182,8 @@ TranslatingXBar::recvTimingReq(PacketPtr pkt, PortID cpu_side_port_id)
 
     // check if we need an address translation
     Tick trans_delay = 0;
-    if (mem_side_port_id != translatorPortID) {
+    if (mem_side_port_id != translatorPortID &&
+        mem_side_port_id != dmacPortID) {
         AddrRangeList atRange =
             memSidePorts[translatorPortID]->getAddrRanges();
         Addr atBaseAddr = atRange.front().start();

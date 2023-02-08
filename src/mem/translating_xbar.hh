@@ -77,6 +77,11 @@ class TranslatingXBar : public BaseXBar
     PortID translatorPortID;
 
     /**
+     * Port that is connected to the DMA controller
+     */
+    PortID dmacPortID;
+
+    /**
      * Declaration of the translating crossbar CPU-side port type, one
      * will be instantiated for each of the memory-side ports connecting to
      * the crossbar.
