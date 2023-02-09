@@ -19,8 +19,8 @@ SgaDmaController::SgaDmaController(const Params &params) :
 {
     eotEvent = new EventFunctionWrapper([this]{ eotCallback(); }, name(),
                                         true);
-    dmaFifo  = new SgaDmaReadFifoCb(this, dmaPort, 1024, 64, 8,
-                                    Request::UNCACHEABLE, eotEvent);
+    dmaFifo  = new SgaDmaCbFifo(this, dmaPort, 1024, 64, 8,
+                                Request::UNCACHEABLE, eotEvent);
 }
 
 SgaDmaController::~SgaDmaController()

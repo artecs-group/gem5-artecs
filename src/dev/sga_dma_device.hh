@@ -213,15 +213,15 @@ class SgaDmaDevice : public PioDevice
  * the atEndOfBlock() method and more advanced implementations may
  * override the onEndOfBlock() callback.
  */
-class SgaDmaReadFifo : public Drainable, public Serializable
+class SgaDmaFifo : public Drainable, public Serializable
 {
   public:
-    SgaDmaReadFifo(SgaDmaPort &port, size_t size,
-                   unsigned max_req_size,
-                   unsigned max_pending,
-                   Request::Flags flags=0);
+    SgaDmaFifo(SgaDmaPort &port, size_t size,
+               unsigned max_req_size,
+               unsigned max_pending,
+               Request::Flags flags = 0);
 
-    ~SgaDmaReadFifo();
+    ~SgaDmaFifo();
 
   public: // Serializable
     void serialize(CheckpointOut &cp) const override;
@@ -319,7 +319,7 @@ class SgaDmaReadFifo : public Drainable, public Serializable
     class SgaDmaDoneEvent : public Event
     {
       public:
-        SgaDmaDoneEvent(SgaDmaReadFifo *_parent, size_t max_size);
+        SgaDmaDoneEvent(SgaDmaFifo *_parent, size_t max_size);
 
         void kill();
         void cancel();
@@ -333,7 +333,7 @@ class SgaDmaReadFifo : public Drainable, public Serializable
         uint8_t *data() { return _data.data(); }
 
       private:
-        SgaDmaReadFifo *parent;
+        SgaDmaFifo *parent;
         bool _done = false;
         bool _canceled = false;
         size_t _requestSize;
@@ -374,7 +374,7 @@ class SgaDmaReadFifo : public Drainable, public Serializable
     std::deque<SgaDmaDoneEventUPtr> freeRequests;
 };
 
-class SgaDmaReadFifoCb : public SgaDmaReadFifo
+class SgaDmaCbFifo : public SgaDmaFifo
 {
   private:
     ClockedObject *owner;
@@ -382,12 +382,12 @@ class SgaDmaReadFifoCb : public SgaDmaReadFifo
     void onIdle() override;
 
   public:
-    SgaDmaReadFifoCb(ClockedObject *device,
-                     SgaDmaPort &port, size_t size,
-                     unsigned max_req_size,
-                     unsigned max_pending,
-                     Request::Flags flags = 0,
-                     Event *eot_event = nullptr);
+    SgaDmaCbFifo(ClockedObject *device,
+                 SgaDmaPort &port, size_t size,
+                 unsigned max_req_size,
+                 unsigned max_pending,
+                 Request::Flags flags = 0,
+                 Event *eot_event = nullptr);
 };
 
 } // namespace gem5

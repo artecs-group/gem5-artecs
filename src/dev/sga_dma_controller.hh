@@ -92,7 +92,7 @@ class SgaDmaController : public SgaDmaDevice, public CatCmdInterface
     };
 
     /* DMA FIFO */
-    SgaDmaReadFifo *dmaFifo;
+    SgaDmaCbFifo *dmaFifo;
 
     /* Response register */
     uint8_t responseReg;

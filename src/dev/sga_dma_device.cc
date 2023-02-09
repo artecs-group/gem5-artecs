@@ -330,10 +330,10 @@ SgaDmaDevice::getPort(const std::string &if_name, PortID idx)
     return PioDevice::getPort(if_name, idx);
 }
 
-SgaDmaReadFifo::SgaDmaReadFifo(SgaDmaPort &_port, size_t size,
-                               unsigned max_req_size,
-                               unsigned max_pending,
-                               Request::Flags flags)
+SgaDmaFifo::SgaDmaFifo(SgaDmaPort &_port, size_t size,
+                       unsigned max_req_size,
+                       unsigned max_pending,
+                       Request::Flags flags)
     : maxReqSize(max_req_size), fifoSize(size),
       reqFlags(flags), port(_port), cacheLineSize(port.sys->cacheLineSize()),
       buffer(size)
@@ -344,7 +344,7 @@ SgaDmaReadFifo::SgaDmaReadFifo(SgaDmaPort &_port, size_t size,
 
 }
 
-SgaDmaReadFifo::~SgaDmaReadFifo()
+SgaDmaFifo::~SgaDmaFifo()
 {
     for (auto &p : pendingRequests) {
         SgaDmaDoneEvent *e(p.release());
@@ -361,7 +361,7 @@ SgaDmaReadFifo::~SgaDmaReadFifo()
 }
 
 void
-SgaDmaReadFifo::serialize(CheckpointOut &cp) const
+SgaDmaFifo::serialize(CheckpointOut &cp) const
 {
     assert(pendingRequests.empty());
 
@@ -372,7 +372,7 @@ SgaDmaReadFifo::serialize(CheckpointOut &cp) const
 }
 
 void
-SgaDmaReadFifo::unserialize(CheckpointIn &cp)
+SgaDmaFifo::unserialize(CheckpointIn &cp)
 {
     UNSERIALIZE_CONTAINER(buffer);
     UNSERIALIZE_SCALAR(endAddr);
@@ -381,7 +381,7 @@ SgaDmaReadFifo::unserialize(CheckpointIn &cp)
 }
 
 void
-SgaDmaReadFifo::startFill(Addr start, Addr dst, size_t size)
+SgaDmaFifo::startFill(Addr start, Addr dst, size_t size)
 {
     assert(atEndOfBlock());
 
@@ -392,7 +392,7 @@ SgaDmaReadFifo::startFill(Addr start, Addr dst, size_t size)
 }
 
 void
-SgaDmaReadFifo::stopFill()
+SgaDmaFifo::stopFill()
 {
     // Prevent new DMA requests by setting the next address to the end
     // address. Pending requests will still complete.
@@ -405,7 +405,7 @@ SgaDmaReadFifo::stopFill()
 }
 
 void
-SgaDmaReadFifo::resumeFill()
+SgaDmaFifo::resumeFill()
 {
     // Don't try to fetch more data if we are draining. This ensures
     // that the DMA engine settles down before we checkpoint it.
@@ -424,7 +424,7 @@ SgaDmaReadFifo::resumeFill()
 }
 
 void
-SgaDmaReadFifo::resumeFillBypass()
+SgaDmaFifo::resumeFillBypass()
 {
     const size_t fifo_space = buffer.capacity() - buffer.size();
     if (fifo_space >= cacheLineSize || buffer.capacity() < cacheLineSize) {
@@ -447,7 +447,7 @@ SgaDmaReadFifo::resumeFillBypass()
 }
 
 void
-SgaDmaReadFifo::resumeFillTiming()
+SgaDmaFifo::resumeFillTiming()
 {
     size_t size_pending(0);
     for (auto &e : pendingRequests)
@@ -474,7 +474,7 @@ SgaDmaReadFifo::resumeFillTiming()
 }
 
 void
-SgaDmaReadFifo::dmaDone()
+SgaDmaFifo::dmaDone()
 {
     const bool old_active(isActive());
 
@@ -486,7 +486,7 @@ SgaDmaReadFifo::dmaDone()
 }
 
 void
-SgaDmaReadFifo::handlePending()
+SgaDmaFifo::handlePending()
 {
     while (!pendingRequests.empty() && pendingRequests.front()->done()) {
         // Get the first finished pending request
@@ -505,34 +505,34 @@ SgaDmaReadFifo::handlePending()
 }
 
 DrainState
-SgaDmaReadFifo::drain()
+SgaDmaFifo::drain()
 {
     return pendingRequests.empty() ?
         DrainState::Drained : DrainState::Draining;
 }
 
 
-SgaDmaReadFifo::SgaDmaDoneEvent::SgaDmaDoneEvent(SgaDmaReadFifo *_parent,
-                                                 size_t max_size)
+SgaDmaFifo::SgaDmaDoneEvent::SgaDmaDoneEvent(SgaDmaFifo *_parent,
+                                             size_t max_size)
     : parent(_parent), _data(max_size, 0)
 {
 }
 
 void
-SgaDmaReadFifo::SgaDmaDoneEvent::kill()
+SgaDmaFifo::SgaDmaDoneEvent::kill()
 {
     parent = nullptr;
     setFlags(AutoDelete);
 }
 
 void
-SgaDmaReadFifo::SgaDmaDoneEvent::cancel()
+SgaDmaFifo::SgaDmaDoneEvent::cancel()
 {
     _canceled = true;
 }
 
 void
-SgaDmaReadFifo::SgaDmaDoneEvent::reset(size_t size)
+SgaDmaFifo::SgaDmaDoneEvent::reset(size_t size)
 {
     assert(size <= _data.size());
     _done = false;
@@ -541,7 +541,7 @@ SgaDmaReadFifo::SgaDmaDoneEvent::reset(size_t size)
 }
 
 void
-SgaDmaReadFifo::SgaDmaDoneEvent::process()
+SgaDmaFifo::SgaDmaDoneEvent::process()
 {
     if (!parent)
         return;
@@ -551,19 +551,19 @@ SgaDmaReadFifo::SgaDmaDoneEvent::process()
     parent->dmaDone();
 }
 
-SgaDmaReadFifoCb::SgaDmaReadFifoCb(ClockedObject *device,
-                                   SgaDmaPort &port, size_t size,
-                                   unsigned max_req_size,
-                                   unsigned max_pending,
-                                   Request::Flags flags,
-                                   Event *eot_event)
-    : SgaDmaReadFifo(port, size, max_req_size, max_pending, flags),
+SgaDmaCbFifo::SgaDmaCbFifo(ClockedObject *device,
+                           SgaDmaPort &port, size_t size,
+                           unsigned max_req_size,
+                           unsigned max_pending,
+                           Request::Flags flags,
+                           Event *eot_event)
+    : SgaDmaFifo(port, size, max_req_size, max_pending, flags),
       owner(device),
       eotEvent(eot_event)
 { }
 
 void
-SgaDmaReadFifoCb::onIdle()
+SgaDmaCbFifo::onIdle()
 {
     if (eotEvent) {
         owner->schedule(eotEvent, curTick() + 1);
