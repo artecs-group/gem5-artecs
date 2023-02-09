@@ -374,6 +374,22 @@ class SgaDmaReadFifo : public Drainable, public Serializable
     std::deque<SgaDmaDoneEventUPtr> freeRequests;
 };
 
+class SgaDmaReadFifoCb : public SgaDmaReadFifo
+{
+  private:
+    ClockedObject *owner;
+    Event *eotEvent;
+    void onIdle() override;
+
+  public:
+    SgaDmaReadFifoCb(ClockedObject *device,
+                     SgaDmaPort &port, size_t size,
+                     unsigned max_req_size,
+                     unsigned max_pending,
+                     Request::Flags flags = 0,
+                     Event *eot_event = nullptr);
+};
+
 } // namespace gem5
 
 #endif // __DEV_SGA_DMA_DEVICE_HH__

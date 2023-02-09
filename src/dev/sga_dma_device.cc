@@ -100,6 +100,7 @@ SgaDmaPort::handleResp(SgaDmaReqState *state, Addr addr, Addr size, Tick delay,
                 "data to addr %#x (dst)\n", addr, dst_addr);
 
         if (!sendTimingReq(dst_pkt)) {
+            assert(!inRetryDst);
             DPRINTF(DMA, "Data forwarding to addr %#x failed, adding to " \
                     "retry list\n", dst_addr);
             inRetryDst = dst_pkt;
@@ -548,6 +549,25 @@ SgaDmaReadFifo::SgaDmaDoneEvent::process()
     assert(!_done);
     _done = true;
     parent->dmaDone();
+}
+
+SgaDmaReadFifoCb::SgaDmaReadFifoCb(ClockedObject *device,
+                                   SgaDmaPort &port, size_t size,
+                                   unsigned max_req_size,
+                                   unsigned max_pending,
+                                   Request::Flags flags,
+                                   Event *eot_event)
+    : SgaDmaReadFifo(port, size, max_req_size, max_pending, flags),
+      owner(device),
+      eotEvent(eot_event)
+{ }
+
+void
+SgaDmaReadFifoCb::onIdle()
+{
+    if (eotEvent) {
+        owner->schedule(eotEvent, curTick() + 1);
+    }
 }
 
 } // namespace gem5

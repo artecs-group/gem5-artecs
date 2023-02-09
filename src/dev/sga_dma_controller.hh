@@ -106,6 +106,9 @@ class SgaDmaController : public SgaDmaDevice, public CatCmdInterface
     /* Current parameters */
     params_t currentParams;
 
+    /* Event triggered at the end of a DMA transfer */
+    EventFunctionWrapper *eotEvent;
+
     /* Set the response to the corresponding register */
     void setResponse(resp_t resp);
 
@@ -119,6 +122,9 @@ class SgaDmaController : public SgaDmaDevice, public CatCmdInterface
     /* Methods to start and stop the DMA transfer */
     bool startTransfer();
     bool stopTransfer();
+
+    /* Callback of eobEvent to update the status */
+    void eotCallback();
 
   public:
     PARAMS(SgaDmaController);

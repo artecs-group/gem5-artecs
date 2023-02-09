@@ -17,13 +17,16 @@ SgaDmaController::SgaDmaController(const Params &params) :
     statusReg(0),
     running(false)
 {
-    dmaFifo = new SgaDmaReadFifo(dmaPort, 1024, 64, 8,
-                                 Request::UNCACHEABLE);
+    eotEvent = new EventFunctionWrapper([this]{ eotCallback(); }, name(),
+                                        true);
+    dmaFifo  = new SgaDmaReadFifoCb(this, dmaPort, 1024, 64, 8,
+                                    Request::UNCACHEABLE, eotEvent);
 }
 
 SgaDmaController::~SgaDmaController()
 {
     delete(dmaFifo);
+    delete(eotEvent);
 }
 
 AddrRangeList
@@ -165,22 +168,36 @@ SgaDmaController::regWrite(Addr addr, uint64_t data)
 bool
 SgaDmaController::startTransfer()
 {
-    bool success = false;
     if (!running) {
-        running = true;
         Addr src = currentParams.start_addr;
         Addr dst = currentParams.tr_b_addr;
         Addr len = currentParams.length;
         dmaFifo->startFill(src, dst, len);
+        setStatus(CAT_STS_RUNNING);
+        running = true;
+        return true;
     }
-    return success;
+    return false;
 }
 
 bool
 SgaDmaController::stopTransfer()
 {
-    bool success = false;
-    return success;
+    if (running) {
+        dmaFifo->stopFill();
+        running = false;
+        return true;
+    }
+    return false;
+}
+
+void
+SgaDmaController::eotCallback()
+{
+    DPRINTF(SGA_DMA, "The DMA transfer has been %s\n",
+            running ? "completed" : "canceled");
+    setStatus(CAT_STS_IDLE);
+    running = false;
 }
 
 Tick
