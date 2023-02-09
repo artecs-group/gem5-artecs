@@ -230,17 +230,6 @@ class SgaDmaReadFifo : public Drainable, public Serializable
   public: // Drainable
     DrainState drain() override;
 
-  public: // FIFO access
-    /**
-     * @{
-     * @name FIFO access
-     */
-    /** Get the amount of data stored in the FIFO */
-    size_t size() const { return buffer.size(); }
-    /** Flush the FIFO */
-    void flush() { buffer.flush(); }
-
-    /** @} */
   public: // FIFO fill control
     /**
      * @{
@@ -254,6 +243,7 @@ class SgaDmaReadFifo : public Drainable, public Serializable
      * sent (i.e., atEndOfBlock() is true).
      *
      * @param start Physical address to copy from.
+     * @param dst Physical address to copy to.
      * @param size Size of the block to copy.
      */
     void startFill(Addr start, Addr dst, size_t size);
