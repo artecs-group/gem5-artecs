@@ -47,8 +47,8 @@
 
 #include "base/logging.hh"
 #include "base/trace.hh"
-#include "debug/DMA.hh"
 #include "debug/Drain.hh"
+#include "debug/SgaDma.hh"
 #include "sim/clocked_object.hh"
 #include "sim/system.hh"
 
@@ -96,12 +96,12 @@ SgaDmaPort::handleResp(SgaDmaReqState *state, Addr addr, Addr size, Tick delay,
         dst_pkt->allocate();
         dst_pkt->setData(data);
 
-        DPRINTF(DMA, "Received response for addr %#x (src), forwarding " \
+        DPRINTF(SgaDma, "Received response for addr %#x (src), forwarding " \
                 "data to addr %#x (dst)\n", addr, dst_addr);
 
         if (!sendTimingReq(dst_pkt)) {
             assert(!inRetryDst);
-            DPRINTF(DMA, "Data forwarding to addr %#x failed, adding to " \
+            DPRINTF(SgaDma, "Data forwarding to addr %#x failed, adding to " \
                     "retry list\n", dst_addr);
             inRetryDst = dst_pkt;
         }
@@ -109,7 +109,7 @@ SgaDmaPort::handleResp(SgaDmaReqState *state, Addr addr, Addr size, Tick delay,
         return;
     }
 
-    DPRINTF(DMA, "Received response for addr %#x (dst), size: %d, nb: %d,"  \
+    DPRINTF(SgaDma, "Received response for addr %#x (dst), size: %d, nb: %d," \
             " tot: %d, sched %d\n",
             addr, size,
             state->numBytes, state->totBytes,
@@ -195,7 +195,7 @@ void
 SgaDmaPort::recvReqRetry()
 {
     if (inRetryDst) {
-        DPRINTF(DMA, "Retrying data forward to address %#x\n",
+        DPRINTF(SgaDma, "Retrying data forward to address %#x\n",
                 inRetryDst->getAddr());
         if (sendTimingReq(inRetryDst)) {
             inRetryDst = nullptr;
@@ -211,8 +211,8 @@ SgaDmaPort::dmaAction(Addr src, Addr dst, int size, Event *event,
                       uint8_t *data, uint32_t sid, uint32_t ssid, Tick delay,
                       Request::Flags flag)
 {
-    DPRINTF(DMA, "Starting DMA for addr: %#x size: %d sched: %d\n", src, size,
-            event ? event->scheduled() : -1);
+    DPRINTF(SgaDma, "Starting DMA for addr: %#x size: %d sched: %d\n", src,
+            size, event ? event->scheduled() : -1);
 
     // One DMA request sender state for every action, that is then
     // split into many requests and packets based on the block size,
@@ -246,7 +246,7 @@ SgaDmaPort::trySendTimingReq()
     PacketPtr pkt = inRetry ? inRetry : state->createPacket();
     inRetry = nullptr;
 
-    DPRINTF(DMA, "Trying to send %s addr %#x\n", pkt->cmdString(),
+    DPRINTF(SgaDma, "Trying to send %s addr %#x\n", pkt->cmdString(),
             pkt->getAddr());
 
     // Check if this was the last packet now, since hypothetically the packet
@@ -260,7 +260,7 @@ SgaDmaPort::trySendTimingReq()
             transmitList.pop_front();
         else
             state->gen.next();
-        DPRINTF(DMA, "-- Done\n");
+        DPRINTF(SgaDma, "-- Done\n");
         // If there is more to do, then do so.
         if (!transmitList.empty()) {
             // This should ultimately wait for as many cycles as the device
@@ -269,10 +269,10 @@ SgaDmaPort::trySendTimingReq()
             device->schedule(sendEvent, device->clockEdge(Cycles(1)));
         }
     } else {
-        DPRINTF(DMA, "-- Failed, waiting for retry\n");
+        DPRINTF(SgaDma, "-- Failed, waiting for retry\n");
     }
 
-    DPRINTF(DMA, "TransmitList: %d, inRetry: %d\n",
+    DPRINTF(SgaDma, "TransmitList: %d, inRetry: %d\n",
             transmitList.size(), inRetry ? 1 : 0);
 }
 
@@ -299,7 +299,7 @@ SgaDmaPort::sendDma()
         // If we are either waiting for a retry or are still waiting after
         // sending the last packet, then do not proceed.
         if (inRetry || sendEvent.scheduled()) {
-            DPRINTF(DMA, "Can't send immediately, waiting to send\n");
+            DPRINTF(SgaDma, "Can't send immediately, waiting to send\n");
             return;
         }
 
@@ -433,7 +433,7 @@ SgaDmaFifo::resumeFillBypass()
         std::vector<uint8_t> tmp_buffer(xfer_size);
 
         assert(pendingRequests.empty());
-        DPRINTF(DMA, "Direct bypass startAddr=%#x xfer_size=%#x " \
+        DPRINTF(SgaDma, "Direct bypass startAddr=%#x xfer_size=%#x " \
                 "fifo_space=%#x block_remaining=%#x\n",
                 nextAddr, xfer_size, fifo_space, block_remaining);
 

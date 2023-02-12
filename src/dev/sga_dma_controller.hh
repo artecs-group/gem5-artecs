@@ -45,7 +45,7 @@
 #ifndef __DEV_SGA_DMA_CONTROLLER_HH__
 #define __DEV_SGA_DMA_CONTROLLER_HH__
 
-#include "debug/SGA_DMA.hh"
+#include "debug/SgaDma.hh"
 #include "dev/cat_cmd_interface.hh"
 #include "dev/sga_dma_device.hh"
 #include "params/SgaDmaController.hh"

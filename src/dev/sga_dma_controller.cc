@@ -84,7 +84,7 @@ SgaDmaController::regRead(Addr addr)
         break;
       case SGA_DMA_STS_REG:
         r = statusReg;
-        DPRINTF(SGA_DMA, "Reading SGA_DMA_STS_REG: %#x\n", r);
+        DPRINTF(SgaDma, "Reading SGA_DMA_STS_REG: %#x\n", r);
         break;
       default:
         r = -1;
@@ -100,7 +100,7 @@ SgaDmaController::regWrite(Addr addr, uint64_t data)
     bool process_req = false;
     switch (addr / sizeof(uint64_t)) {
       case SGA_DMA_REQ_REG:
-        DPRINTF(SGA_DMA, "Writing SGA_DMA_REQ_REG: %#x\n", data);
+        DPRINTF(SgaDma, "Writing SGA_DMA_REQ_REG: %#x\n", data);
         process_req = true;
         break;
       case SGA_DMA_RESP_REG:
@@ -125,7 +125,7 @@ SgaDmaController::regWrite(Addr addr, uint64_t data)
     std::string cmd_name = "CMD_UNKNOWN";
     bool success = setParams(data, currentParams, cmd_name);
     if (success) {
-        DPRINTF(SGA_DMA, "Received command SGA_DMA_%s\n", cmd_name);
+        DPRINTF(SgaDma, "Received command SGA_DMA_%s\n", cmd_name);
         setResponse(CAT_CMD_ACK);
         return;
     }
@@ -137,16 +137,16 @@ SgaDmaController::regWrite(Addr addr, uint64_t data)
         break;
 
       case CAT_START_STOP:
-        DPRINTF(SGA_DMA, "Received command CAT_START_STOP\n");
+        DPRINTF(SgaDma, "Received command CAT_START_STOP\n");
         switch(decodeStartStop(payload)) {
           case CAT_SUB_START:
-            DPRINTF(SGA_DMA, "Command is START, beginning transfer\n");
+            DPRINTF(SgaDma, "Command is START, beginning transfer\n");
             startTransfer();
             setResponse(CAT_CMD_ACK);
             break;
 
           case CAT_SUB_STOP:
-            DPRINTF(SGA_DMA, "Command is STOP, interrupting transfer\n");
+            DPRINTF(SgaDma, "Command is STOP, interrupting transfer\n");
             stopTransfer();
             setResponse(CAT_CMD_ACK);
             break;
@@ -194,7 +194,7 @@ SgaDmaController::stopTransfer()
 void
 SgaDmaController::eotCallback()
 {
-    DPRINTF(SGA_DMA, "The DMA transfer has been %s\n",
+    DPRINTF(SgaDma, "The DMA transfer has been %s\n",
             running ? "completed" : "canceled");
     setStatus(CAT_STS_IDLE);
     running = false;
@@ -205,17 +205,17 @@ SgaDmaController::read(PacketPtr pkt)
 {
     Addr pkt_addr = pkt->getAddr();
     if (pkt_addr < pioAddr || pkt_addr >= pioAddr + pioSize) {
-        panic("Address %#x is out of SGA_DMA address range!", pkt_addr);
+        panic("Address %#x is out of SgaDma address range!", pkt_addr);
         return 1;
     }
 
     Addr sga_dma_addr = pkt_addr - pioAddr;
 
-    DPRINTF(SGA_DMA,
+    DPRINTF(SgaDma,
         "Read request - addr: %#x, size: %#x\n", sga_dma_addr, pkt->getSize());
 
     uint64_t read = regRead(sga_dma_addr);
-    DPRINTF(SGA_DMA, "Packet Read: %#x\n", read);
+    DPRINTF(SgaDma, "Packet Read: %#x\n", read);
     pkt->setUintX(read, byteOrder);
     pkt->makeResponse();
 
@@ -227,17 +227,17 @@ SgaDmaController::write(PacketPtr pkt)
 {
     Addr pkt_addr = pkt->getAddr();
     if (pkt_addr < pioAddr || pkt_addr >= pioAddr + pioSize) {
-        panic("Address %#x is out of SGA_DMA address range!", pkt_addr);
+        panic("Address %#x is out of SgaDma address range!", pkt_addr);
         return 1;
     }
 
     Addr sga_dma_addr = pkt_addr - pioAddr;
 
-    DPRINTF(SGA_DMA, "Write register %#x value %#x\n", sga_dma_addr,
+    DPRINTF(SgaDma, "Write register %#x value %#x\n", sga_dma_addr,
             pkt->getUintX(byteOrder));
 
     regWrite(sga_dma_addr, pkt->getUintX(byteOrder));
-    DPRINTF(SGA_DMA, "Packet Write Value: %d\n", pkt->getUintX(byteOrder));
+    DPRINTF(SgaDma, "Packet Write Value: %d\n", pkt->getUintX(byteOrder));
     pkt->makeResponse();
 
     return pioDelay;
