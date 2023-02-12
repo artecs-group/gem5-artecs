@@ -183,7 +183,8 @@ TranslatingXBar::recvTimingReq(PacketPtr pkt, PortID cpu_side_port_id)
     // check if we need an address translation
     Tick trans_delay = 0;
     if (mem_side_port_id != translatorPortID &&
-        mem_side_port_id != dmacPortID) {
+        mem_side_port_id != dmacPortID &&
+        pkt->req->taskId() != context_switch_task_id::DMA) {
         AddrRangeList atRange =
             memSidePorts[translatorPortID]->getAddrRanges();
         Addr atBaseAddr = atRange.front().start();
