@@ -111,7 +111,7 @@ class CAT : public BasicPioDevice, public CatCmdInterface
      * It returns void since the result is
      * saved in the response register.
      */
-    void lookup(uint64_t reg);
+    void lookup(Addr addr);
 
     /**
      * Method to start the address translation
