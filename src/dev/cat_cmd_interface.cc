@@ -1,5 +1,7 @@
 #include "dev/cat_cmd_interface.hh"
 
+#include "base/logging.hh"
+
 namespace gem5
 {
 
@@ -131,6 +133,70 @@ CatCmdInterface::setParams(uint64_t req, params_t &p, std::string &cmd_name)
         break;
     }
     return success;
+}
+
+unsigned
+CatCmdInterface::generateLut(params_t p, std::map<Addr, Addr> &lut)
+{
+    lut.clear();
+
+    std::array<int16_t, 3> strides = { p.seq_stride,
+                                       p.iv2_stride,
+                                       p.iv3_stride };
+    std::array<Addr, 3> start_addr = { p.start_addr,
+                                       p.start_addr + p.iv2_offset,
+                                       p.start_addr + p.iv3_offset };
+    std::array<Addr, 3> cur_addr = start_addr;
+    Addr out_addr = p.tr_b_addr;
+
+    uint16_t length = p.length;
+    if (!length) {
+        panic("The length of the interval must not be 0!");
+        return 0;
+    }
+
+    uint8_t intlv = 0;
+    switch (p.mode) {
+      case CAT_SEQUENTIAL:
+        intlv = 1;
+        break;
+      case CAT_INTLV_D2:
+        intlv = 2;
+        break;
+      case CAT_INTLV_D3:
+        intlv = 3;
+        break;
+      default:
+        intlv = 0;
+        panic("Specified mode is not valid!");
+        return 0;
+        break;
+    }
+    uint16_t ol_length = (p.ol_length < 1 ? 1 : p.ol_length);
+
+    /* Create the LUT with every possible combination of addresses */
+    for (uint16_t ol_iter = 0; ol_iter < ol_length; ol_iter++) {
+        uint16_t elem = 0;
+        // Inner loop
+        while (elem < length) {
+            // Interleaving control
+            for (uint8_t i = 0; (i < intlv && elem++ < length); i++) {
+                if (!lut.count(cur_addr[i])) {
+                    lut[cur_addr[i]] = out_addr;
+                    // Keep granularity fixed to 64 bits for now
+                    out_addr += sizeof(uint64_t);
+                }
+                cur_addr[i] = int64_t(cur_addr[i]) + strides[i];
+            }
+        }
+        // End of inner loop, add outer loop offset
+        for (uint8_t i = 0; i < intlv; i++) {
+            start_addr[i] = int64_t(start_addr[i]) + p.ol_offset;
+        }
+        cur_addr = start_addr;
+    }
+
+    return out_addr;
 }
 
 } // namespace gem5

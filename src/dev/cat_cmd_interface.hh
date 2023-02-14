@@ -27,8 +27,10 @@
  * +=======+====================+
  */
 
-#ifndef __DEV_CAT_COMMON_HH__
-#define __DEV_CAT_COMMON_HH__
+#ifndef __DEV_CAT_CMD_INTERFACE_HH__
+#define __DEV_CAT_CMD_INTERFACE_HH__
+
+#include <map>
 
 #include "base/types.hh"
 
@@ -37,28 +39,7 @@ namespace gem5
 
 class CatCmdInterface
 {
-  protected:
-    /* Request commands */
-    enum cmd_t
-    {
-        CAT_NO_COMMAND,
-        CAT_SET_ST_ADDR,
-        CAT_SET_INTLV_D2,
-        CAT_SET_INTLV_D3,
-        CAT_SET_OLOOP,
-        CAT_SET_STR_MODE,
-        CAT_SET_TR_B_ADDR,
-        CAT_START_STOP
-    };
-
-    /* Start/stop subcommands */
-    enum subcmd_t
-    {
-        CAT_SUB_UNKNOWN,
-        CAT_SUB_START,
-        CAT_SUB_STOP
-    };
-
+  public:
     /* Operation modes */
     enum opmode_t
     {
@@ -84,6 +65,28 @@ class CatCmdInterface
         opmode_t mode = CAT_MOD_UNKNOWN;  // Operation mode
     };
 
+  protected:
+    /* Request commands */
+    enum cmd_t
+    {
+        CAT_NO_COMMAND,
+        CAT_SET_ST_ADDR,
+        CAT_SET_INTLV_D2,
+        CAT_SET_INTLV_D3,
+        CAT_SET_OLOOP,
+        CAT_SET_STR_MODE,
+        CAT_SET_TR_B_ADDR,
+        CAT_START_STOP
+    };
+
+    /* Start/stop subcommands */
+    enum subcmd_t
+    {
+        CAT_SUB_UNKNOWN,
+        CAT_SUB_START,
+        CAT_SUB_STOP
+    };
+
     /* Decode the command of a request */
     cmd_t decodeCmd(uint64_t req) const;
 
@@ -99,10 +102,16 @@ class CatCmdInterface
     /* Set parameters according to received request */
     bool setParams(uint64_t req, params_t &p, std::string &cmd_name);
 
+    /**
+     * Generate an address LUT given the translation parameters.
+     * @return the number of bytes of the compacted elements
+     */
+    unsigned generateLut(params_t p, std::map<Addr, Addr> &lut);
+
     /* Protected constructor */
     CatCmdInterface() { };
 };
 
 } // namespace gem5
 
-#endif /* __DEV_CAT_COMMON_HH__ */
+#endif /* __DEV_CAT_CMD_INTERFACE_HH__ */

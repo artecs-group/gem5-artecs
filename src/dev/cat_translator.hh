@@ -2,7 +2,9 @@
  * Compacting Address Translator (CAT)
  * -----------------------------------
  *
- * Description of CAT_REQ_REG:
+ * Description of
+ * CAT_REQ_REG:
+ *
  * 60         52    47               0
  * +==========+=====+================+
  * | ENTRY_ID | CMD | DATA / ADDRESS |
@@ -10,24 +12,23 @@
  *
  * Table of commands: see cat_cmd_interface.hh
  *
- * Description of CAT_RESP_REG:
+ * -----------------------------------
+ *
+ * Description of
+ * CAT_RESP_REG:
+ *
  * 43       39        0
  * +========+=========+
  * | STATUS | ADDRESS |
  * +========+=========+
  *
  * List of CAT_RESP_REG statuses:
- * +======+====================+
- * | 0000 |     NOT MAPPED     |
- * +======+====================+
- * | 0101 |    COMMAND ACK     |
- * +======+====================+
- * | 1001 |    COMMAND NACK    |
- * +======+====================+
- * | 1010 |  MAPPED, NOT FOUND |
- * +======+====================+
- * | 1111 |   MAPPED, FOUND    |
- * +======+====================+
+ *
+ * [0b0000]: NOT MAPPED
+ * [0b1010]: MAPPED, NOT FOUND
+ * [0b1111]: MAPPED, FOUND
+ * [0b0101]: COMMAND ACK
+ * [0b1001]: COMMAND NACK
  */
 
 #ifndef __DEV_CAT_HH__
