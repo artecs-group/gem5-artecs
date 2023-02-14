@@ -45,10 +45,10 @@ SgaDmaController::setResponse(resp_t resp)
     uint8_t value;
     switch (resp) {
       default:
-      case CAT_CMD_NACK:
+      case SGA_DMA_CMD_NACK:
         value = 0b0000;
         break;
-      case CAT_CMD_ACK:
+      case SGA_DMA_CMD_ACK:
         value = 0b1111;
         break;
     }
@@ -62,10 +62,10 @@ SgaDmaController::setStatus(status_t status)
     uint8_t value;
     switch (status) {
       default:
-      case CAT_STS_IDLE:
+      case SGA_DMA_STS_IDLE:
         value = 0b0000;
         break;
-      case CAT_STS_RUNNING:
+      case SGA_DMA_STS_RUNNING:
         value = 0b1111;
         break;
     }
@@ -126,14 +126,14 @@ SgaDmaController::regWrite(Addr addr, uint64_t data)
     bool success = setParams(data, currentParams, cmd_name);
     if (success) {
         DPRINTF(SgaDma, "Received command SGA_DMA_%s\n", cmd_name);
-        setResponse(CAT_CMD_ACK);
+        setResponse(SGA_DMA_CMD_ACK);
         return;
     }
 
     switch(cmd) {
       case CAT_NO_COMMAND:
         panic("No command received\n");
-        setResponse(CAT_CMD_NACK);
+        setResponse(SGA_DMA_CMD_NACK);
         break;
 
       case CAT_START_STOP:
@@ -142,25 +142,25 @@ SgaDmaController::regWrite(Addr addr, uint64_t data)
           case CAT_SUB_START:
             DPRINTF(SgaDma, "Command is START, beginning transfer\n");
             startTransfer();
-            setResponse(CAT_CMD_ACK);
+            setResponse(SGA_DMA_CMD_ACK);
             break;
 
           case CAT_SUB_STOP:
             DPRINTF(SgaDma, "Command is STOP, interrupting transfer\n");
             stopTransfer();
-            setResponse(CAT_CMD_ACK);
+            setResponse(SGA_DMA_CMD_ACK);
             break;
 
           default:
             panic("Command in neither START or STOP!");
-            setResponse(CAT_CMD_NACK);
+            setResponse(SGA_DMA_CMD_NACK);
             break;
         }
         break;
 
       default:
         panic("Command is invalid!");
-        setResponse(CAT_CMD_NACK);
+        setResponse(SGA_DMA_CMD_NACK);
         break;
     }
 }
@@ -173,7 +173,7 @@ SgaDmaController::startTransfer()
         Addr dst = currentParams.tr_b_addr;
         Addr len = currentParams.length;
         dmaFifo->startFill(src, dst, len);
-        setStatus(CAT_STS_RUNNING);
+        setStatus(SGA_DMA_STS_RUNNING);
         running = true;
         return true;
     }
@@ -196,7 +196,7 @@ SgaDmaController::eotCallback()
 {
     DPRINTF(SgaDma, "The DMA transfer has been %s\n",
             running ? "completed" : "canceled");
-    setStatus(CAT_STS_IDLE);
+    setStatus(SGA_DMA_STS_IDLE);
     running = false;
 }
 

@@ -80,15 +80,15 @@ class SgaDmaController : public SgaDmaDevice, public CatCmdInterface
     /* Response type */
     enum resp_t
     {
-        CAT_CMD_NACK,
-        CAT_CMD_ACK
+        SGA_DMA_CMD_NACK,
+        SGA_DMA_CMD_ACK
     };
 
     /* Running status */
     enum status_t
     {
-        CAT_STS_IDLE,
-        CAT_STS_RUNNING
+        SGA_DMA_STS_IDLE,
+        SGA_DMA_STS_RUNNING
     };
 
     /* DMA FIFO */
