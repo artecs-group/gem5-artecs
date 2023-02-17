@@ -177,6 +177,9 @@ class TranslatingXBar : public BaseXBar
         }
     };
 
+    /* Packets creation helper for DMAC and address translator */
+    PacketPtr createPacket(MemCmd cmd, Addr addr, uint64_t data = 0);
+
     virtual bool recvTimingReq(PacketPtr pkt, PortID cpu_side_port_id);
     virtual bool recvTimingResp(PacketPtr pkt, PortID mem_side_port_id);
     void recvReqRetry(PortID mem_side_port_id);

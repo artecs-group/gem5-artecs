@@ -142,6 +142,24 @@ TranslatingXBar::getPort(const std::string &if_name, PortID idx)
     }
 }
 
+PacketPtr
+TranslatingXBar::createPacket(MemCmd cmd, Addr addr, uint64_t data)
+{
+    RequestPtr req;
+    PacketPtr  pkt;
+    req = std::make_shared<Request>(
+        addr,
+        sizeof(uint64_t),
+        0,
+        Request::funcRequestorId);
+    pkt = new Packet(req, cmd);
+    pkt->allocate();
+    if (cmd == MemCmd::WriteReq) {
+        pkt->set(data, ByteOrder::little);
+    }
+    return pkt;
+}
+
 bool
 TranslatingXBar::recvTimingReq(PacketPtr pkt, PortID cpu_side_port_id)
 {
@@ -192,37 +210,19 @@ TranslatingXBar::recvTimingReq(PacketPtr pkt, PortID cpu_side_port_id)
         PacketPtr  q_pkt;
 
         // write address to the first register of the translator
-        q_req = std::make_shared<Request>(
-            atBaseAddr,
-            sizeof(uint64_t),
-            0,
-            Request::funcRequestorId);
-        q_pkt = new Packet(q_req, MemCmd::WriteReq);
-        q_pkt->allocate();
-        q_pkt->set(pkt_addr, ByteOrder::little);
+        q_pkt = createPacket(MemCmd::WriteReq, atBaseAddr, pkt_addr);
         memSidePorts[translatorPortID]->sendFunctional(q_pkt);
         delete q_pkt;
 
         // read response from the second register of the translator
-        q_req = std::make_shared<Request>(
-            atBaseAddr + sizeof(uint64_t),
-            sizeof(uint64_t),
-            0,
-            Request::funcRequestorId);
-        q_pkt = new Packet(q_req, MemCmd::ReadReq);
-        q_pkt->allocate();
+        q_pkt = createPacket(MemCmd::ReadReq, atBaseAddr + sizeof(uint64_t));
         memSidePorts[translatorPortID]->sendFunctional(q_pkt);
         uint64_t q_ans = q_pkt->getUintX(ByteOrder::little);
         delete q_pkt;
 
         // read ready time from the third register of the translator
-        q_req = std::make_shared<Request>(
-            atBaseAddr + (2 * sizeof(uint64_t)),
-            sizeof(uint64_t),
-            0,
-            Request::funcRequestorId);
-        q_pkt = new Packet(q_req, MemCmd::ReadReq);
-        q_pkt->allocate();
+        q_pkt = createPacket(MemCmd::ReadReq,
+                             atBaseAddr + (2 * sizeof(uint64_t)));
         memSidePorts[translatorPortID]->sendFunctional(q_pkt);
         uint64_t q_rdy_time = q_pkt->getUintX(ByteOrder::little);
         Tick tick = curTick() + pkt->headerDelay;
