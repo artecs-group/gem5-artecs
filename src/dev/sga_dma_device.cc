@@ -276,18 +276,6 @@ SgaDmaPort::trySendTimingReq()
             transmitList.size(), inRetry ? 1 : 0);
 }
 
-bool
-SgaDmaPort::sendAtomicReq(SgaDmaReqState *state)
-{
-    panic("Only timing mode is supported");
-}
-
-bool
-SgaDmaPort::sendAtomicBdReq(SgaDmaReqState *state)
-{
-    panic("Only timing mode is supported");
-}
-
 void
 SgaDmaPort::sendDma()
 {
@@ -305,17 +293,7 @@ SgaDmaPort::sendDma()
 
         trySendTimingReq();
     } else if (sys->isAtomicMode()) {
-        const bool bypass = sys->bypassCaches();
-
-        // Send everything there is to send in zero time.
-        while (!transmitList.empty()) {
-            SgaDmaReqState *state = transmitList.front();
-            transmitList.pop_front();
-
-            bool done = state->gen.done();
-            while (!done)
-                done = bypass ? sendAtomicBdReq(state) : sendAtomicReq(state);
-        }
+        panic("Only timing mode is supported.");
     } else {
         panic("Unknown memory mode.");
     }

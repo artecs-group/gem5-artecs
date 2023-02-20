@@ -93,14 +93,6 @@ class SgaDmaPort : public RequestPort, public Drainable
         PacketPtr createPacket();
     };
 
-    /** Send the next packet from a DMA request in atomic mode. */
-    bool sendAtomicReq(SgaDmaReqState *state);
-    /**
-     * Send the next packet from a DMA request in atomic mode, and request
-     * and/or use memory backdoors if possible.
-     */
-    bool sendAtomicBdReq(SgaDmaReqState *state);
-
     /**
      * Handle a response packet by updating the corresponding DMA
      * request state to reflect the bytes received, and also update
