@@ -178,7 +178,7 @@ TranslatingXBar::recvTimingReq(PacketPtr pkt, PortID cpu_side_port_id)
     AddrRangeList translator_range =
         memSidePorts[translatorPortID]->getAddrRanges();
     AddrRangeList dmac_range = memSidePorts[dmacPortID]->getAddrRanges();
-    Addr translator_base_addr = translator_range.front().start();
+    Addr at_base_addr = translator_range.front().start();
     Addr dmac_base_addr = dmac_range.front().start();
 
     uint8_t high_bits = pkt_addr >> 61;
@@ -186,7 +186,7 @@ TranslatingXBar::recvTimingReq(PacketPtr pkt, PortID cpu_side_port_id)
         uint64_t data = pkt_addr & 0x1fffffffffffffff;
         if (high_bits == 0b001) {
             DPRINTF(TranslatingXBar, "Found translator programming command\n");
-            pkt->setAddr(translator_base_addr);
+            pkt->setAddr(at_base_addr);
             pkt->set(data, ByteOrder::little);
         } else if (high_bits == 0b010) {
             DPRINTF(TranslatingXBar, "Found DMAC programming command\n");
@@ -203,35 +203,32 @@ TranslatingXBar::recvTimingReq(PacketPtr pkt, PortID cpu_side_port_id)
     if (mem_side_port_id != translatorPortID &&
         mem_side_port_id != dmacPortID &&
         pkt->req->taskId() != context_switch_task_id::DMA) {
-        AddrRangeList atRange =
-            memSidePorts[translatorPortID]->getAddrRanges();
-        Addr atBaseAddr = atRange.front().start();
         RequestPtr q_req;
         PacketPtr  q_pkt;
 
         // write address to the first register of the translator
-        q_pkt = createPacket(MemCmd::WriteReq, atBaseAddr, pkt_addr);
+        q_pkt = createPacket(MemCmd::WriteReq, at_base_addr, pkt_addr);
         memSidePorts[translatorPortID]->sendFunctional(q_pkt);
         delete q_pkt;
 
         // read response from the second register of the translator
-        q_pkt = createPacket(MemCmd::ReadReq, atBaseAddr + sizeof(uint64_t));
+        q_pkt = createPacket(MemCmd::ReadReq, at_base_addr + sizeof(uint64_t));
         memSidePorts[translatorPortID]->sendFunctional(q_pkt);
         uint64_t q_ans = q_pkt->getUintX(ByteOrder::little);
         delete q_pkt;
 
         // read ready time from the third register of the translator
         q_pkt = createPacket(MemCmd::ReadReq,
-                             atBaseAddr + (2 * sizeof(uint64_t)));
+                             at_base_addr + (2 * sizeof(uint64_t)));
         memSidePorts[translatorPortID]->sendFunctional(q_pkt);
         uint64_t q_rdy_time = q_pkt->getUintX(ByteOrder::little);
+        delete q_pkt;
         Tick tick = curTick() + pkt->headerDelay;
         if (q_rdy_time > tick) {
             DPRINTF(TranslatingXBar, "Entry will be ready at tick %lld, "
                     "adding extra delay\n", q_rdy_time);
             trans_delay = q_rdy_time - tick;
         }
-        delete q_pkt;
 
         // to-do: make this information less hardcoded
         uint8_t status = (q_ans >> 40) & 0xf;
