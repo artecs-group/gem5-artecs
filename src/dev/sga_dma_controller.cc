@@ -135,11 +135,11 @@ SgaDmaController::regRead(Addr addr)
         break;
       case SGA_DMA_RESP_REG:
         r = responseReg;
-        DPRINTF(SgaDma, "Reading SGA_DMA_RESP_REG: %#x\n", r);
+        //DPRINTF(SgaDma, "Reading SGA_DMA_RESP_REG: %#x\n", r);
         break;
       case SGA_DMA_STS_REG:
         r = statusReg;
-        DPRINTF(SgaDma, "Reading SGA_DMA_STS_REG: %#x\n", r);
+        //DPRINTF(SgaDma, "Reading SGA_DMA_STS_REG: %#x\n", r);
         break;
       default:
         r = -1;
@@ -155,7 +155,7 @@ SgaDmaController::regWrite(Addr addr, uint64_t data)
     bool process_req = false;
     switch (addr / sizeof(uint64_t)) {
       case SGA_DMA_REQ_REG:
-        DPRINTF(SgaDma, "Writing SGA_DMA_REQ_REG: %#x\n", data);
+        //DPRINTF(SgaDma, "Writing SGA_DMA_REQ_REG: %#x\n", data);
         process_req = true;
         break;
       case SGA_DMA_RESP_REG:
@@ -271,11 +271,11 @@ SgaDmaController::read(PacketPtr pkt)
 
     Addr sga_dma_addr = pkt_addr - pioAddr;
 
-    DPRINTF(SgaDma,
-        "Read request - addr: %#x, size: %#x\n", sga_dma_addr, pkt->getSize());
+    //DPRINTF(SgaDma, "Read request - addr: %#x, size: %#x\n",
+    //        sga_dma_addr, pkt->getSize());
 
     uint64_t read = regRead(sga_dma_addr);
-    DPRINTF(SgaDma, "Packet Read: %#x\n", read);
+    //DPRINTF(SgaDma, "Packet Read: %#x\n", read);
     pkt->setUintX(read, byteOrder);
     pkt->makeResponse();
 
@@ -293,11 +293,11 @@ SgaDmaController::write(PacketPtr pkt)
 
     Addr sga_dma_addr = pkt_addr - pioAddr;
 
-    DPRINTF(SgaDma, "Write register %#x value %#x\n", sga_dma_addr,
-            pkt->getUintX(byteOrder));
+    //DPRINTF(SgaDma, "Write register %#x value %#x\n", sga_dma_addr,
+    //        pkt->getUintX(byteOrder));
 
     regWrite(sga_dma_addr, pkt->getUintX(byteOrder));
-    DPRINTF(SgaDma, "Packet Write Value: %d\n", pkt->getUintX(byteOrder));
+    //DPRINTF(SgaDma, "Packet Write Value: %d\n", pkt->getUintX(byteOrder));
     pkt->makeResponse();
 
     return pioDelay;
