@@ -125,12 +125,23 @@ class SgaDmaPort : public RequestPort, public Drainable
     /** Event used to schedule a future sending from the transmit list. */
     EventFunctionWrapper sendEvent;
 
+    /** Event used to schedule a sending of a packet to the destination */
+    EventFunctionWrapper sendDestEvent;
+
     /** Number of outstanding packets the dma port has. */
     uint32_t pendingCount = 0;
 
     /** The packet (if any) waiting for a retry to send. */
     PacketPtr inRetry = nullptr;
-    PacketPtr inRetryDst = nullptr;
+
+    /** List of packets directed to destination */
+    PacketList toDest;
+
+    /** Flag that indicates a failure on send to destination */
+    bool sendDestFail;
+
+    /** Counter of retry requests when both source and destination are busy */
+    int countRetries;
 
     /** Default streamId */
     const uint32_t defaultSid;
@@ -141,6 +152,8 @@ class SgaDmaPort : public RequestPort, public Drainable
     const int cacheLineSize;
 
   protected:
+
+    void sendDest();
 
     bool recvTimingResp(PacketPtr pkt) override;
     void recvReqRetry() override;

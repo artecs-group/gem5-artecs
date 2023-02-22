@@ -60,6 +60,8 @@ SgaDmaPort::SgaDmaPort(ClockedObject *dev, System *s,
     : RequestPort(dev->name() + ".dma", dev),
       device(dev), sys(s), requestorId(s->getRequestorId(dev)),
       sendEvent([this]{ sendDma(); }, dev->name()),
+      sendDestEvent([this]{ sendDest(); }, dev->name()),
+      sendDestFail(false), countRetries(0),
       defaultSid(sid), defaultSSid(ssid), cacheLineSize(s->cacheLineSize())
 { }
 
@@ -98,14 +100,10 @@ SgaDmaPort::handleResp(SgaDmaReqState *state, Addr addr, Addr size, Tick delay,
 
         DPRINTF(SgaDma, "Received response for addr %#x (src), forwarding " \
                 "data to addr %#x (dst)\n", addr, dst_addr);
-
-        if (!sendTimingReq(dst_pkt)) {
-            assert(!inRetryDst);
-            DPRINTF(SgaDma, "Data forwarding to addr %#x failed, adding to " \
-                    "retry list\n", dst_addr);
-            inRetryDst = dst_pkt;
+        toDest.emplace_back(dst_pkt);
+        if (!sendDestFail && !sendDestEvent.scheduled()) {
+            device->schedule(sendDestEvent, device->clockEdge(Cycles(1)));
         }
-
         return;
     }
 
@@ -192,17 +190,47 @@ SgaDmaPort::drain()
 }
 
 void
+SgaDmaPort::sendDest()
+{
+    assert (!sendDestFail);
+    if (!toDest.empty()) {
+        auto it = toDest.begin();
+        DPRINTF(SgaDma, "Retrying data forward to address %#x\n",
+                (*it)->getAddr());
+        if (sendTimingReq(*it)) {
+            toDest.erase(it);
+            device->schedule(sendDestEvent, device->clockEdge(Cycles(1)));
+        } else {
+            sendDestFail = true;
+        }
+    }
+}
+
+void
 SgaDmaPort::recvReqRetry()
 {
-    if (inRetryDst) {
-        DPRINTF(SgaDma, "Retrying data forward to address %#x\n",
-                inRetryDst->getAddr());
-        if (sendTimingReq(inRetryDst)) {
-            inRetryDst = nullptr;
-        }
-    } else {
+    const bool retryDest = sendDestFail;
+    const bool retrySrc  = (inRetry != nullptr);
+
+    if (retryDest && !retrySrc) {
+        sendDestFail = false;
+        sendDest();
+    } else if (!retryDest && retrySrc) {
         assert(transmitList.size());
         trySendTimingReq();
+    } else if (retryDest && retrySrc) {
+        // We don't know which send to retry.
+        // Wait for 2 retry requests before proceeding.
+        countRetries++;
+        if (countRetries >= 2) {
+            // Retry both destination and source sending.
+            sendDestFail = false;
+            sendDest();
+            assert(transmitList.size());
+            trySendTimingReq();
+            // Reset counter
+            countRetries = 0;
+        }
     }
 }
 
