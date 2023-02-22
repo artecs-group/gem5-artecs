@@ -167,8 +167,12 @@ void BaseXBar::Layer<SrcType, DstType>::occupyLayer(Tick until)
     // unoccupied layer
     assert(state == BUSY);
 
-    // until should never be 0 as express snoops never occupy the layer
-    assert(until != 0);
+    if (!until) {
+        // release the layer immediately (used in translating_xbar)
+        releaseLayer();
+        return;
+    }
+
     xbar.schedule(releaseEvent, until);
 
     // account for the occupied ticks

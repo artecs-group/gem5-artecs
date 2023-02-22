@@ -285,7 +285,7 @@ TranslatingXBar::recvTimingReq(PacketPtr pkt, PortID cpu_side_port_id)
     pkt->headerDelay += trans_delay;
 
     // determine how long to be crossbar layer is busy
-    Tick packetFinishTime = clockEdge(Cycles(1)) + pkt->payloadDelay;
+    //Tick packetFinishTime = clockEdge(Cycles(1)) + pkt->payloadDelay;
 
     // before forwarding the packet (and possibly altering it),
     // remember if we are expecting a response
@@ -303,8 +303,7 @@ TranslatingXBar::recvTimingReq(PacketPtr pkt, PortID cpu_side_port_id)
         pkt->headerDelay = old_header_delay;
 
         // occupy until the header is sent
-        reqLayers[mem_side_port_id]->failedTiming(src_port,
-                                                clockEdge(Cycles(1)));
+        reqLayers[mem_side_port_id]->failedTiming(src_port, 0);
 
         return false;
     }
@@ -315,7 +314,7 @@ TranslatingXBar::recvTimingReq(PacketPtr pkt, PortID cpu_side_port_id)
         routeTo[pkt->req] = cpu_side_port_id;
     }
 
-    reqLayers[mem_side_port_id]->succeededTiming(packetFinishTime);
+    reqLayers[mem_side_port_id]->succeededTiming(0);
 
     // stats updates
     pktCount[cpu_side_port_id][mem_side_port_id]++;
@@ -361,7 +360,7 @@ TranslatingXBar::recvTimingResp(PacketPtr pkt, PortID mem_side_port_id)
     calcPacketTiming(pkt, xbar_delay);
 
     // determine how long to be crossbar layer is busy
-    Tick packetFinishTime = clockEdge(Cycles(1)) + pkt->payloadDelay;
+    //Tick packetFinishTime = clockEdge(Cycles(1)) + pkt->payloadDelay;
 
     // send the packet through the destination CPU-side port, and pay for
     // any outstanding latency
@@ -373,7 +372,7 @@ TranslatingXBar::recvTimingResp(PacketPtr pkt, PortID mem_side_port_id)
     // remove the request from the routing table
     routeTo.erase(route_lookup);
 
-    respLayers[cpu_side_port_id]->succeededTiming(packetFinishTime);
+    respLayers[cpu_side_port_id]->succeededTiming(0);
 
     // stats updates
     pktCount[cpu_side_port_id][mem_side_port_id]++;
