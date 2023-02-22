@@ -57,7 +57,7 @@ SgaDmaController::decodeDir(uint64_t req) const
 }
 
 void
-SgaDmaController::setResponse(resp_t resp)
+SgaDmaController::setCmdResponse(resp_cmd_t resp)
 {
     uint8_t value;
     switch (resp) {
@@ -71,6 +71,23 @@ SgaDmaController::setResponse(resp_t resp)
     }
     responseReg &= ~((uint8_t)0b1111);
     responseReg |=  ((uint8_t)value);
+}
+
+void
+SgaDmaController::setBusyResponse(resp_busy_t resp)
+{
+    uint8_t value;
+    switch (resp) {
+      default:
+      case SGA_DMA_ADDR_AVAIL:
+        value = 0b0000;
+        break;
+      case SGA_DMA_ADDR_BUSY:
+        value = 0b1111;
+        break;
+    }
+    responseReg &= ~((uint8_t)0b1111 << 4);
+    responseReg |=  ((uint8_t)value  << 4);
 }
 
 void
@@ -90,6 +107,23 @@ SgaDmaController::setStatus(status_t status)
     statusReg |=  ((uint8_t)value);
 }
 
+void
+SgaDmaController::checkBusy(Addr addr)
+{
+    bool gat = (direction == SGA_DMA_DIR_GATH);
+    if (running) {
+        // Check if the address corresponds to any of the data being written
+        if ((!gat && (addr >= compRange.first && addr < compRange.second)) ||
+            (gat && (lut.find(addr) != lut.end()))) {
+            DPRINTF(SgaDma, "Address is busy, delaying the request\n");
+            setBusyResponse(SGA_DMA_ADDR_BUSY);
+        } else {
+            DPRINTF(SgaDma, "Address is available, proceeding\n");
+            setBusyResponse(SGA_DMA_ADDR_AVAIL);
+        }
+    }
+}
+
 uint64_t
 SgaDmaController::regRead(Addr addr)
 {
@@ -98,6 +132,10 @@ SgaDmaController::regRead(Addr addr)
       case SGA_DMA_REQ_REG:
         r = -1;
         panic("SGA_DMA_REQ_REG is write-only!");
+        break;
+      case SGA_DMA_RESP_REG:
+        r = responseReg;
+        DPRINTF(SgaDma, "Reading SGA_DMA_RESP_REG: %#x\n", r);
         break;
       case SGA_DMA_STS_REG:
         r = statusReg;
@@ -143,14 +181,15 @@ SgaDmaController::regWrite(Addr addr, uint64_t data)
     bool success = setParams(data, currentParams, cmd_name);
     if (success) {
         DPRINTF(SgaDma, "Received command SGA_DMA_%s\n", cmd_name);
-        setResponse(SGA_DMA_CMD_ACK);
+        setCmdResponse(SGA_DMA_CMD_ACK);
         return;
     }
 
     switch(cmd) {
       case CAT_NO_COMMAND:
-        panic("No command received\n");
-        setResponse(SGA_DMA_CMD_NACK);
+        DPRINTF(SgaDma, "No command received, checking if requested address " \
+                "%#x is available\n", payload);
+        checkBusy(payload);
         break;
 
       case CAT_START_STOP:
@@ -159,25 +198,25 @@ SgaDmaController::regWrite(Addr addr, uint64_t data)
           case CAT_SUB_START:
             DPRINTF(SgaDma, "Command is START, beginning transfer\n");
             startTransfer(decodeDir(payload));
-            setResponse(SGA_DMA_CMD_ACK);
+            setCmdResponse(SGA_DMA_CMD_ACK);
             break;
 
           case CAT_SUB_STOP:
             DPRINTF(SgaDma, "Command is STOP, interrupting transfer\n");
             stopTransfer();
-            setResponse(SGA_DMA_CMD_ACK);
+            setCmdResponse(SGA_DMA_CMD_ACK);
             break;
 
           default:
             panic("Command in neither START or STOP!");
-            setResponse(SGA_DMA_CMD_NACK);
+            setCmdResponse(SGA_DMA_CMD_NACK);
             break;
         }
         break;
 
       default:
         panic("Command is invalid!");
-        setResponse(SGA_DMA_CMD_NACK);
+        setCmdResponse(SGA_DMA_CMD_NACK);
         break;
     }
 }
@@ -189,6 +228,8 @@ SgaDmaController::startTransfer(dir_t dir)
         Addr src = currentParams.start_addr;
         Addr dst = currentParams.tr_b_addr;
         Addr len = currentParams.length;
+        unsigned bytes = generateLut(currentParams, lut);
+        compRange = std::make_pair(dst, dst + bytes);
         direction = dir;
         dmaFifo->startFill(src, dst, len);
         setStatus(SGA_DMA_STS_RUNNING);
@@ -215,6 +256,7 @@ SgaDmaController::eotCallback()
     DPRINTF(SgaDma, "The DMA transfer has been %s\n",
             running ? "completed" : "canceled");
     setStatus(SGA_DMA_STS_IDLE);
+    lut.clear();
     running = false;
 }
 

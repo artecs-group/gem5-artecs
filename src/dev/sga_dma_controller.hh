@@ -28,12 +28,18 @@
  * Description of
  * SGA_DMA_RESP_REG:
  *
- * 3          0
- * +==========+
- * | ACK/NACK |
- * +==========+
+ * 7           3            0
+ * +===========+============+
+ * | BUSY ADDR | ACK / NACK |
+ * +===========+============+
  *
- * ACK/NACK codes:
+ * BUSY ADDR codes:
+ *
+ * [0b0000]: ADDRESS AVAILABLE
+ * [0b1111]: ADDRESS BUSY
+ *
+ * ACK / NACK codes:
+ *
  * [0b0000]: COMMAND NACK
  * [0b1111]: COMMAND ACK
  *
@@ -89,10 +95,16 @@ class SgaDmaController : public SgaDmaDevice, public CatCmdInterface
     };
 
     /* Response type */
-    enum resp_t
+    enum resp_cmd_t
     {
         SGA_DMA_CMD_NACK,
         SGA_DMA_CMD_ACK
+    };
+
+    enum resp_busy_t
+    {
+        SGA_DMA_ADDR_AVAIL,
+        SGA_DMA_ADDR_BUSY
     };
 
     /* Running status */
@@ -127,6 +139,12 @@ class SgaDmaController : public SgaDmaDevice, public CatCmdInterface
     /* Current parameters */
     params_t currentParams;
 
+    /* Address LUT */
+    std::map<Addr, Addr> lut;
+
+    /* Compacted address range (after gathering) */
+    std::pair<Addr, Addr> compRange;
+
     /* Event triggered at the end of a DMA transfer */
     EventFunctionWrapper *eotEvent;
 
@@ -134,10 +152,14 @@ class SgaDmaController : public SgaDmaDevice, public CatCmdInterface
     dir_t decodeDir(uint64_t req) const;
 
     /* Set the response to the corresponding register */
-    void setResponse(resp_t resp);
+    void setCmdResponse(resp_cmd_t resp);
+    void setBusyResponse(resp_busy_t resp);
 
     /* Set the status to the corresponding register  */
     void setStatus(status_t status);
+
+    /* Method to check whether the requested address is busy */
+    void checkBusy(Addr addr);
 
     /* Methods to access SGA-DMA registers */
     uint64_t regRead(Addr addr);
