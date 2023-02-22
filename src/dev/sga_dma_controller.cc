@@ -15,7 +15,8 @@ SgaDmaController::SgaDmaController(const Params &params) :
     pioDelay(params.pio_latency),
     responseReg(0),
     statusReg(0),
-    running(false)
+    running(false),
+    direction(SGA_DMA_DIR_GATH)
 {
     eotEvent = new EventFunctionWrapper([this]{ eotCallback(); }, name(),
                                         true);
@@ -37,6 +38,22 @@ SgaDmaController::getAddrRanges() const
     DPRINTF(AddrRanges, "registering range: %#x-%#x\n", pioAddr, pioSize);
     ranges.push_back(RangeSize(pioAddr, pioSize));
     return ranges;
+}
+
+SgaDmaController::dir_t
+SgaDmaController::decodeDir(uint64_t req) const
+{
+    dir_t dir;
+    switch ((req >> 8) & 0xff) {
+      default:
+      case 0x00:
+        dir = SGA_DMA_DIR_GATH;
+      break;
+      case 0xf0:
+        dir = SGA_DMA_DIR_SCAT;
+      break;
+    }
+    return dir;
 }
 
 void
@@ -141,7 +158,7 @@ SgaDmaController::regWrite(Addr addr, uint64_t data)
         switch(decodeStartStop(payload)) {
           case CAT_SUB_START:
             DPRINTF(SgaDma, "Command is START, beginning transfer\n");
-            startTransfer();
+            startTransfer(decodeDir(payload));
             setResponse(SGA_DMA_CMD_ACK);
             break;
 
@@ -166,12 +183,13 @@ SgaDmaController::regWrite(Addr addr, uint64_t data)
 }
 
 bool
-SgaDmaController::startTransfer()
+SgaDmaController::startTransfer(dir_t dir)
 {
     if (!running) {
         Addr src = currentParams.start_addr;
         Addr dst = currentParams.tr_b_addr;
         Addr len = currentParams.length;
+        direction = dir;
         dmaFifo->startFill(src, dst, len);
         setStatus(SGA_DMA_STS_RUNNING);
         running = true;

@@ -10,8 +10,18 @@
  * | CMD | DATA / ADDRESS |
  * +=====+================+
  *
- * Table of commands:
- * see cat_cmd_interface.hh
+ * Table of commands: see cat_cmd_interface.hh
+ * Modifications:
+ *
+ * 52     47   15           7              0
+ * +=======+====+===========+==============+
+ * | 11111 | ND | DIRECTION | START / STOP |
+ * +=======+====+===========+==============+
+ *
+ * DIRECTION codes:
+ *
+ * [0x00]: GATHERING
+ * [0xf0]: SCATTERING
  *
  * -----------------------------------------
  *
@@ -38,6 +48,7 @@
  * +==========+
  *
  * STATUS codes:
+ *
  * [0b0000]: IDLE
  * [0b1111]: RUNNING
  **/
@@ -91,6 +102,13 @@ class SgaDmaController : public SgaDmaDevice, public CatCmdInterface
         SGA_DMA_STS_RUNNING
     };
 
+    /* Scattering direction type */
+    enum dir_t
+    {
+        SGA_DMA_DIR_GATH,
+        SGA_DMA_DIR_SCAT
+    };
+
     /* DMA FIFO */
     SgaDmaCbFifo *dmaFifo;
 
@@ -103,11 +121,17 @@ class SgaDmaController : public SgaDmaDevice, public CatCmdInterface
     /* Is the DMA engine running? */
     bool running;
 
+    /* Scattering direction (gathering or scattering) */
+    dir_t direction;
+
     /* Current parameters */
     params_t currentParams;
 
     /* Event triggered at the end of a DMA transfer */
     EventFunctionWrapper *eotEvent;
+
+    /* Decode the direction of a start request */
+    dir_t decodeDir(uint64_t req) const;
 
     /* Set the response to the corresponding register */
     void setResponse(resp_t resp);
@@ -120,7 +144,7 @@ class SgaDmaController : public SgaDmaDevice, public CatCmdInterface
     void regWrite(Addr addr, uint64_t data);
 
     /* Methods to start and stop the DMA transfer */
-    bool startTransfer();
+    bool startTransfer(dir_t dir);
     bool stopTransfer();
 
     /* Callback of eobEvent to update the status */
