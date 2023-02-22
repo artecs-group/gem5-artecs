@@ -82,6 +82,11 @@ class TranslatingXBar : public BaseXBar
     PortID dmacPortID;
 
     /**
+     * List of packets that have to be released after DMA transfer completion
+     */
+    PacketList busyList;
+
+    /**
      * Declaration of the translating crossbar CPU-side port type, one
      * will be instantiated for each of the memory-side ports connecting to
      * the crossbar.

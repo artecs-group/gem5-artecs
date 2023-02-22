@@ -192,6 +192,8 @@ TranslatingXBar::recvTimingReq(PacketPtr pkt, PortID cpu_side_port_id)
             DPRINTF(TranslatingXBar, "Found DMAC programming command\n");
             pkt->setAddr(dmac_base_addr);
             pkt->set(data, ByteOrder::little);
+        } else if (high_bits == 0b100) {
+            DPRINTF(TranslatingXBar, "Found DMAC completion signal\n");
         }
     }
 
@@ -254,6 +256,24 @@ TranslatingXBar::recvTimingReq(PacketPtr pkt, PortID cpu_side_port_id)
             panic("Not a valid after-lookup status");
             break;
         }
+
+        /*
+        // check if any dma transfer is in progress for the required address
+        // - query
+        q_pkt = createPacket(MemCmd::WriteReq, dmac_base_addr, pkt->getAddr());
+        memSidePorts[dmacPortID]->sendFunctional(q_pkt);
+        delete q_pkt;
+        // - response
+        q_pkt = createPacket(MemCmd::ReadReq,
+                             dmac_base_addr + sizeof(uint64_t));
+        memSidePorts[dmacPortID]->sendFunctional(q_pkt);
+        uint64_t q_busy = q_pkt->getUintX(ByteOrder::little);
+        delete q_pkt;
+        if ((q_busy >> 4) & 0xf) {
+            panic("ADDRESS IS BUSY");
+        }
+        */
+
     }
 
     // test if the layer should be considered occupied for the current
