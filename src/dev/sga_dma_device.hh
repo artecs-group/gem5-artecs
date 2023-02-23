@@ -13,6 +13,7 @@
 #include "base/addr_range_map.hh"
 #include "base/chunk_generator.hh"
 #include "base/circlebuf.hh"
+#include "dev/cat_common.hh"
 #include "dev/io_device.hh"
 #include "mem/backdoor.hh"
 #include "params/SgaDmaDevice.hh"
@@ -23,6 +24,9 @@ namespace gem5
 {
 
 class ClockedObject;
+
+namespace cat
+{
 
 class SgaDmaPort : public RequestPort, public Drainable
 {
@@ -394,6 +398,8 @@ class SgaDmaCbFifo : public SgaDmaFifo
                  Request::Flags flags = 0,
                  Event *eot_event = nullptr);
 };
+
+} // namespace cat
 
 } // namespace gem5
 

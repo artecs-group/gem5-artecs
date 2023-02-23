@@ -5,7 +5,7 @@ from m5.objects.Device import PioDevice
 class SgaDmaDevice(PioDevice):
     type = 'SgaDmaDevice'
     cxx_header = "dev/sga_dma_device.hh"
-    cxx_class = 'gem5::SgaDmaDevice'
+    cxx_class = 'gem5::cat::SgaDmaDevice'
     abstract = True
 
     dma = RequestPort("DMA port")
@@ -34,7 +34,7 @@ class SgaDmaDevice(PioDevice):
 class SgaDmaController(SgaDmaDevice):
     type = 'SgaDmaController'
     cxx_header = "dev/sga_dma_controller.hh"
-    cxx_class = 'gem5::SgaDmaController'
+    cxx_class = 'gem5::cat::SgaDmaController'
 
     pio_addr = Param.Addr("Device Address")
     pio_latency = Param.Cycles(1, "Programmed IO latency (cycles)")

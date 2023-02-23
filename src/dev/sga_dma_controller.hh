@@ -10,7 +10,7 @@
  * | CMD | DATA / ADDRESS |
  * +=====+================+
  *
- * Table of commands: see cat_cmd_interface.hh
+ * Table of commands: see cat_common.hh
  * Modifications:
  *
  * 52     47   15           7              0
@@ -63,14 +63,17 @@
 #define __DEV_SGA_DMA_CONTROLLER_HH__
 
 #include "debug/SgaDma.hh"
-#include "dev/cat_cmd_interface.hh"
+#include "dev/cat_common.hh"
 #include "dev/sga_dma_device.hh"
 #include "params/SgaDmaController.hh"
 
 namespace gem5
 {
 
-class SgaDmaController : public SgaDmaDevice, public CatCmdInterface
+namespace cat
+{
+
+class SgaDmaController : public SgaDmaDevice
 {
   protected:
     const ByteOrder byteOrder = ByteOrder::little;
@@ -181,6 +184,8 @@ class SgaDmaController : public SgaDmaDevice, public CatCmdInterface
     Tick read(PacketPtr pkt) override;
     Tick write(PacketPtr pkt) override;
 };
+
+} // namespace cat
 
 } // namespace gem5
 

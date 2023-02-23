@@ -8,6 +8,9 @@
 namespace gem5
 {
 
+namespace cat
+{
+
 SgaDmaController::SgaDmaController(const Params &params) :
     SgaDmaDevice(params),
     pioAddr(params.pio_addr),
@@ -302,5 +305,7 @@ SgaDmaController::write(PacketPtr pkt)
 
     return pioDelay;
 }
+
+} // namespace cat
 
 } // namespace gem5

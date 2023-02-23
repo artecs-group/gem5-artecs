@@ -1,13 +1,14 @@
-#include "dev/cat_cmd_interface.hh"
+#include "dev/cat_common.hh"
 
 #include "base/logging.hh"
 
 namespace gem5
 {
 
-CatCmdInterface::cmd_t
-CatCmdInterface::decodeCmd(uint64_t req) const
+namespace cat
 {
+
+cmd_t decodeCmd(uint64_t req) {
     cmd_t cmd;
     switch ((req >> 48) & 0x1f) {
       case 0b11000:
@@ -37,9 +38,7 @@ CatCmdInterface::decodeCmd(uint64_t req) const
     return cmd;
 }
 
-CatCmdInterface::subcmd_t
-CatCmdInterface::decodeStartStop(uint64_t req) const
-{
+subcmd_t decodeStartStop(uint64_t req) {
     subcmd_t subcmd;
     switch (req & 0xff) {
       case 0b10100101:
@@ -54,9 +53,7 @@ CatCmdInterface::decodeStartStop(uint64_t req) const
     return subcmd;
 };
 
-CatCmdInterface::opmode_t
-CatCmdInterface::decodeMode(uint64_t req) const
-{
+opmode_t decodeMode(uint64_t req) {
     opmode_t opmode;
     switch ((req >> 16) & 0xf) {
       case 0b1100:
@@ -74,14 +71,11 @@ CatCmdInterface::decodeMode(uint64_t req) const
     return opmode;
 }
 
-uint64_t
-CatCmdInterface::getPayload(uint64_t req) const {
+uint64_t getPayload(uint64_t req) {
     return req & 0xffffffffffff;
 }
 
-bool
-CatCmdInterface::setParams(uint64_t req, params_t &p, std::string &cmd_name)
-{
+bool setParams(uint64_t req, params_t &p, std::string &cmd_name) {
     cmd_t    cmd     = decodeCmd(req);
     uint64_t payload = getPayload(req);
 
@@ -135,9 +129,7 @@ CatCmdInterface::setParams(uint64_t req, params_t &p, std::string &cmd_name)
     return success;
 }
 
-unsigned
-CatCmdInterface::generateLut(params_t p, std::map<Addr, Addr> &lut)
-{
+unsigned generateLut(params_t p, std::map<Addr, Addr> &lut) {
     lut.clear();
 
     std::array<int16_t, 3> strides = { p.seq_stride,
@@ -198,5 +190,7 @@ CatCmdInterface::generateLut(params_t p, std::map<Addr, Addr> &lut)
 
     return out_addr;
 }
+
+} // namespace cat
 
 } // namespace gem5

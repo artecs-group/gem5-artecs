@@ -55,6 +55,9 @@
 namespace gem5
 {
 
+namespace cat
+{
+
 SgaDmaPort::SgaDmaPort(ClockedObject *dev, System *s,
                  uint32_t sid, uint32_t ssid)
     : RequestPort(dev->name() + ".dma", dev),
@@ -575,5 +578,7 @@ SgaDmaCbFifo::onIdle()
         owner->schedule(eotEvent, curTick() + 1);
     }
 }
+
+} // namespace cat
 
 } // namespace gem5

@@ -7,6 +7,9 @@
 namespace gem5
 {
 
+namespace cat
+{
+
 CAT::CAT(const Params &params) :
     BasicPioDevice(params, CAT_IOREG_ITEMS * sizeof(uint64_t)),
     configLat(params.config_lat),
@@ -271,4 +274,7 @@ CAT::write(PacketPtr pkt)
 
     return delay;
 }
+
+} // namespace cat
+
 } // namespace gem5

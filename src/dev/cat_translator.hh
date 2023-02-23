@@ -10,7 +10,7 @@
  * | ENTRY_ID | CMD | DATA / ADDRESS |
  * +==========+=====+================+
  *
- * Table of commands: see cat_cmd_interface.hh
+ * Table of commands: see cat_common.hh
  *
  * -----------------------------------
  *
@@ -34,14 +34,17 @@
 #ifndef __DEV_CAT_HH__
 #define __DEV_CAT_HH__
 
-#include "dev/cat_cmd_interface.hh"
+#include "dev/cat_common.hh"
 #include "dev/io_device.hh"
 #include "params/CAT.hh"
 
 namespace gem5
 {
 
-class CAT : public BasicPioDevice, public CatCmdInterface
+namespace cat
+{
+
+class CAT : public BasicPioDevice
 {
   protected:
     const ByteOrder byteOrder = ByteOrder::little;
@@ -146,6 +149,8 @@ class CAT : public BasicPioDevice, public CatCmdInterface
     Tick read(PacketPtr pkt) override;
     Tick write(PacketPtr pkt) override;
 };
+
+} // namespace cat
 
 } // namespace gem5
 
