@@ -129,7 +129,7 @@ bool setParams(uint64_t req, params_t &p, std::string &cmd_name) {
     return success;
 }
 
-unsigned generateLut(params_t p, std::map<Addr, Addr> &lut) {
+void generateLut(params_t p, std::map<Addr, Addr> &lut) {
     lut.clear();
 
     std::array<int16_t, 3> strides = { p.seq_stride,
@@ -144,7 +144,7 @@ unsigned generateLut(params_t p, std::map<Addr, Addr> &lut) {
     uint16_t length = p.length;
     if (!length) {
         panic("The length of the interval must not be 0!");
-        return 0;
+        return;
     }
 
     uint8_t intlv = 0;
@@ -161,7 +161,7 @@ unsigned generateLut(params_t p, std::map<Addr, Addr> &lut) {
       default:
         intlv = 0;
         panic("Specified mode is not valid!");
-        return 0;
+        return;
         break;
     }
     uint16_t ol_length = (p.ol_length < 1 ? 1 : p.ol_length);
@@ -187,8 +187,6 @@ unsigned generateLut(params_t p, std::map<Addr, Addr> &lut) {
         }
         cur_addr = start_addr;
     }
-
-    return out_addr;
 }
 
 } // namespace cat

@@ -231,7 +231,8 @@ SgaDmaController::startTransfer(dir_t dir)
         Addr src = currentParams.start_addr;
         Addr dst = currentParams.tr_b_addr;
         Addr len = currentParams.length;
-        unsigned bytes = generateLut(currentParams, lut);
+        generateLut(currentParams, lut);
+        unsigned bytes = lut.size() * sizeof(uint64_t);
         compRange = std::make_pair(dst, dst + bytes);
         direction = dir;
         dmaFifo->startFill(src, dst, len);

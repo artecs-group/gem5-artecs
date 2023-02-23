@@ -105,7 +105,7 @@ bool setParams(uint64_t req, params_t &p, std::string &cmd_name);
  * Generate an address LUT given the translation parameters.
  * @return the number of bytes of the compacted elements
  */
-unsigned generateLut(params_t p, std::map<Addr, Addr> &lut);
+void generateLut(params_t p, std::map<Addr, Addr> &lut);
 
 } // namespace cat
 
