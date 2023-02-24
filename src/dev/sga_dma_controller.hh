@@ -97,33 +97,6 @@ class SgaDmaController : public SgaDmaDevice
         SGA_DMA_IOREG_ITEMS
     };
 
-    /* Response type */
-    enum resp_cmd_t
-    {
-        SGA_DMA_CMD_NACK,
-        SGA_DMA_CMD_ACK
-    };
-
-    enum resp_busy_t
-    {
-        SGA_DMA_ADDR_AVAIL,
-        SGA_DMA_ADDR_BUSY
-    };
-
-    /* Running status */
-    enum status_t
-    {
-        SGA_DMA_STS_IDLE,
-        SGA_DMA_STS_RUNNING
-    };
-
-    /* Scattering direction type */
-    enum dir_t
-    {
-        SGA_DMA_DIR_GATH,
-        SGA_DMA_DIR_SCAT
-    };
-
     /* DMA FIFO */
     SgaDmaCbFifo *dmaFifo;
 
@@ -136,8 +109,8 @@ class SgaDmaController : public SgaDmaDevice
     /* Is the DMA engine running? */
     bool running;
 
-    /* Scattering direction (gathering or scattering) */
-    dir_t direction;
+    /* Direction flag (true: scattering, false: gathering) */
+    bool scattering;
 
     /* Current parameters */
     params_t currentParams;
@@ -152,14 +125,14 @@ class SgaDmaController : public SgaDmaDevice
     EventFunctionWrapper *eotEvent;
 
     /* Decode the direction of a start request */
-    dir_t decodeDir(uint64_t req) const;
+    bool decodeDir(uint64_t req) const;
 
     /* Set the response to the corresponding register */
-    void setCmdResponse(resp_cmd_t resp);
-    void setBusyResponse(resp_busy_t resp);
+    void setCmdResponse(bool ack);
+    void setBusyResponse(bool busy);
 
     /* Set the status to the corresponding register  */
-    void setStatus(status_t status);
+    void setStatus(bool running);
 
     /* Method to check whether the requested address is busy */
     void checkBusy(Addr addr);
@@ -169,7 +142,7 @@ class SgaDmaController : public SgaDmaDevice
     void regWrite(Addr addr, uint64_t data);
 
     /* Methods to start and stop the DMA transfer */
-    bool startTransfer(dir_t dir);
+    bool startTransfer(bool _scattering);
     bool stopTransfer();
 
     /* Callback of eobEvent to update the status */

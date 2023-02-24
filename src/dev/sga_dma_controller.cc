@@ -19,7 +19,7 @@ SgaDmaController::SgaDmaController(const Params &params) :
     responseReg(0),
     statusReg(0),
     running(false),
-    direction(SGA_DMA_DIR_GATH)
+    scattering(false)
 {
     eotEvent = new EventFunctionWrapper([this]{ eotCallback(); }, name(),
                                         true);
@@ -43,68 +43,56 @@ SgaDmaController::getAddrRanges() const
     return ranges;
 }
 
-SgaDmaController::dir_t
+bool
 SgaDmaController::decodeDir(uint64_t req) const
 {
-    dir_t dir;
+    bool _scattering;
     switch ((req >> 8) & 0xff) {
       default:
       case 0x00:
-        dir = SGA_DMA_DIR_GATH;
+        _scattering = false;
       break;
       case 0xf0:
-        dir = SGA_DMA_DIR_SCAT;
+        _scattering = true;
       break;
     }
-    return dir;
+    return _scattering;
 }
 
 void
-SgaDmaController::setCmdResponse(resp_cmd_t resp)
+SgaDmaController::setCmdResponse(bool ack)
 {
     uint8_t value;
-    switch (resp) {
-      default:
-      case SGA_DMA_CMD_NACK:
+    if (!ack) {
         value = 0b0000;
-        break;
-      case SGA_DMA_CMD_ACK:
+    } else {
         value = 0b1111;
-        break;
     }
     responseReg &= ~((uint8_t)0b1111);
     responseReg |=  ((uint8_t)value);
 }
 
 void
-SgaDmaController::setBusyResponse(resp_busy_t resp)
+SgaDmaController::setBusyResponse(bool busy)
 {
     uint8_t value;
-    switch (resp) {
-      default:
-      case SGA_DMA_ADDR_AVAIL:
+    if (!busy) {
         value = 0b0000;
-        break;
-      case SGA_DMA_ADDR_BUSY:
+    } else {
         value = 0b1111;
-        break;
     }
     responseReg &= ~((uint8_t)0b1111 << 4);
     responseReg |=  ((uint8_t)value  << 4);
 }
 
 void
-SgaDmaController::setStatus(status_t status)
+SgaDmaController::setStatus(bool running)
 {
     uint8_t value;
-    switch (status) {
-      default:
-      case SGA_DMA_STS_IDLE:
+    if (!running) {
         value = 0b0000;
-        break;
-      case SGA_DMA_STS_RUNNING:
+    } else {
         value = 0b1111;
-        break;
     }
     statusReg &= ~((uint8_t)0b1111);
     statusReg |=  ((uint8_t)value);
@@ -113,16 +101,16 @@ SgaDmaController::setStatus(status_t status)
 void
 SgaDmaController::checkBusy(Addr addr)
 {
-    bool gat = (direction == SGA_DMA_DIR_GATH);
+    bool gat = !scattering;
     if (running) {
         // Check if the address corresponds to any of the data being written
         if ((!gat && (addr >= compRange.first && addr < compRange.second)) ||
             (gat && (lut.find(addr) != lut.end()))) {
             DPRINTF(SgaDma, "Address is busy, delaying the request\n");
-            setBusyResponse(SGA_DMA_ADDR_BUSY);
+            setBusyResponse(true);
         } else {
             DPRINTF(SgaDma, "Address is available, proceeding\n");
-            setBusyResponse(SGA_DMA_ADDR_AVAIL);
+            setBusyResponse(false);
         }
     }
 }
@@ -184,7 +172,7 @@ SgaDmaController::regWrite(Addr addr, uint64_t data)
     bool success = setParams(data, currentParams, cmd_name);
     if (success) {
         DPRINTF(SgaDma, "Received command SGA_DMA_%s\n", cmd_name);
-        setCmdResponse(SGA_DMA_CMD_ACK);
+        setCmdResponse(true);
         return;
     }
 
@@ -201,31 +189,31 @@ SgaDmaController::regWrite(Addr addr, uint64_t data)
           case CAT_SUB_START:
             DPRINTF(SgaDma, "Command is START, beginning transfer\n");
             startTransfer(decodeDir(payload));
-            setCmdResponse(SGA_DMA_CMD_ACK);
+            setCmdResponse(true);
             break;
 
           case CAT_SUB_STOP:
             DPRINTF(SgaDma, "Command is STOP, interrupting transfer\n");
             stopTransfer();
-            setCmdResponse(SGA_DMA_CMD_ACK);
+            setCmdResponse(true);
             break;
 
           default:
             panic("Command in neither START or STOP!");
-            setCmdResponse(SGA_DMA_CMD_NACK);
+            setCmdResponse(false);
             break;
         }
         break;
 
       default:
         panic("Command is invalid!");
-        setCmdResponse(SGA_DMA_CMD_NACK);
+        setCmdResponse(false);
         break;
     }
 }
 
 bool
-SgaDmaController::startTransfer(dir_t dir)
+SgaDmaController::startTransfer(bool _scattering)
 {
     if (!running) {
         Addr src = currentParams.start_addr;
@@ -234,9 +222,9 @@ SgaDmaController::startTransfer(dir_t dir)
         generateLut(currentParams, lut);
         unsigned bytes = lut.size() * sizeof(uint64_t);
         compRange = std::make_pair(dst, dst + bytes);
-        direction = dir;
+        scattering = _scattering;
         dmaFifo->startFill(src, dst, len);
-        setStatus(SGA_DMA_STS_RUNNING);
+        setStatus(true);
         running = true;
         return true;
     }
@@ -259,7 +247,7 @@ SgaDmaController::eotCallback()
 {
     DPRINTF(SgaDma, "The DMA transfer has been %s\n",
             running ? "completed" : "canceled");
-    setStatus(SGA_DMA_STS_IDLE);
+    setStatus(false);
     lut.clear();
     running = false;
 }
