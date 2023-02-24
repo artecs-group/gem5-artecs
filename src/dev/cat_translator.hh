@@ -73,14 +73,14 @@ class CAT : public BasicPioDevice
     struct entry_t
     {
         params_t p;                       // Translation parameters
-        Tick ready_time = 0;              // Ready time
-        std::map<Addr, Addr> lut;         // Translation LUT
+        Tick     ready_time = 0;          // Ready time
+        amap_t   lut;                     // Translation LUT
     };
 
     /* Address range with corresponding entry identifier */
     struct range_t
     {
-        std::pair<Addr, Addr> addr_range;
+        apair_t addr_range;
         uint8_t entry_id;
     };
 
@@ -133,7 +133,7 @@ class CAT : public BasicPioDevice
     void stopTranslation(uint8_t entryID);
 
     /* Method to compute the mapped address range */
-    std::pair<Addr, Addr> computeRange(entry_t entry);
+    apair_t computeRange(entry_t entry);
 
     /* Methods to access CAT registers */
     uint64_t CATRegRead(Addr addr, Tick &delay);

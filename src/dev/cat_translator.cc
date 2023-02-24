@@ -70,7 +70,7 @@ CAT::lookup(Addr addr)
         DPRINTF(CAT, "Found a corresponding range for address %#x -> "
                 "entry %d\n", addr, 0);
         uint8_t entry_id = it->entry_id;
-        std::map<Addr, Addr>& lut = entries[entry_id].lut;
+        const amap_t &lut = entries[entry_id].lut;
         readyTimeReg = entries[entry_id].ready_time;
 
         // Second lookup: check if there is an entry in the LUT

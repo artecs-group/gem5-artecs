@@ -129,7 +129,7 @@ bool setParams(uint64_t req, params_t &p, std::string &cmd_name) {
     return success;
 }
 
-void generateLut(params_t p, std::map<Addr, Addr> &lut) {
+void generateLut(params_t p, amap_t &lut) {
     lut.clear();
 
     std::array<int16_t, 3> strides = { p.seq_stride,

@@ -40,6 +40,10 @@ namespace gem5
 namespace  cat
 {
 
+typedef std::pair<Addr, Addr>  apair_t;
+typedef std::map<Addr, Addr>   amap_t;
+typedef amap_t::const_iterator amap_it_t;
+
 /* Operation modes */
 enum opmode_t
 {
@@ -105,7 +109,7 @@ bool setParams(uint64_t req, params_t &p, std::string &cmd_name);
  * Generate an address LUT given the translation parameters.
  * @return the number of bytes of the compacted elements
  */
-void generateLut(params_t p, std::map<Addr, Addr> &lut);
+void generateLut(params_t p, amap_t &lut);
 
 } // namespace cat
 
