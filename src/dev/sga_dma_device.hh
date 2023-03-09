@@ -11,8 +11,8 @@
 #include <memory>
 
 #include "base/addr_range_map.hh"
-#include "base/chunk_generator.hh"
 #include "base/circlebuf.hh"
+#include "base/sga_chunk_generator.hh"
 #include "dev/cat_common.hh"
 #include "dev/io_device.hh"
 #include "mem/backdoor.hh"
@@ -65,7 +65,13 @@ class SgaDmaPort : public RequestPort, public Drainable
         const Tick delay;
 
         /** Object to track what chunks of bytes to send at a time. */
-        ChunkGenerator gen;
+        SgaChunkGenerator gen;
+
+        /** The address translation lut. */
+        const amap_t &lut;
+
+        /** Direction flag (true: scattering, false: gathering) */
+        const bool scattering;
 
         /** Pointer to a buffer for the data. */
         uint8_t *const data = nullptr;
@@ -80,18 +86,15 @@ class SgaDmaPort : public RequestPort, public Drainable
         const uint32_t sid;
         const uint32_t ssid;
 
-        /** -- SGA-DMA Additions --. */
-        Addr src;
-        Addr dst;
-        /** -----------------------. */
-
-        SgaDmaReqState(Addr _src, Addr _dst, Addr chunk_sz,
-                       Addr tb, uint8_t *_data, Request::Flags _flags,
-                       RequestorID _id, uint32_t _sid, uint32_t _ssid,
-                       Event *ce, Tick _delay)
-            : completionEvent(ce), totBytes(tb), delay(_delay),
-              gen(_src, tb, chunk_sz), data(_data), flags(_flags),
-              id(_id), sid(_sid), ssid(_ssid), src(_src), dst(_dst)
+        SgaDmaReqState(const amap_t &_lut, amap_it_t start, uint16_t length,
+                       bool _scattering, Addr chunk_sz, Addr chunk_al,
+                       uint8_t *_data, Request::Flags _flags, RequestorID _id,
+                       uint32_t _sid, uint32_t _ssid, Event *ce, Tick _delay)
+            : completionEvent(ce), totBytes(length * sizeof(uint64_t)),
+              delay(_delay),
+              gen(_lut, start, length, _scattering, chunk_sz, chunk_al),
+              lut(_lut), scattering(_scattering), data(_data),
+              flags(_flags), id(_id), sid(_sid), ssid(_ssid)
         {}
 
         PacketPtr createPacket();
@@ -167,13 +170,14 @@ class SgaDmaPort : public RequestPort, public Drainable
     SgaDmaPort(ClockedObject *dev, System *s, uint32_t sid=0, uint32_t ssid=0);
 
     void
-    dmaAction(Addr src, Addr dst, int size, Event *event, uint8_t *data,
-              Tick delay, Request::Flags flag=0);
+    dmaAction(const amap_t &lut, amap_it_t start, uint16_t length,
+              bool scattering, Event *event, uint8_t *data, uint32_t sid,
+              uint32_t ssid, Tick delay, Request::Flags flag = 0);
 
     void
-    dmaAction(Addr src, Addr dst, int size, Event *event, uint8_t *data,
-              uint32_t sid, uint32_t ssid, Tick delay,
-              Request::Flags flag=0);
+    dmaAction(const amap_t &lut, amap_it_t start, uint16_t length,
+              bool scattering, Event *event, uint8_t *data, Tick delay,
+              Request::Flags flag = 0);
 
     bool dmaPending() const { return pendingCount > 0; }
 
@@ -251,11 +255,10 @@ class SgaDmaFifo : public Drainable, public Serializable
      * engine unless the last request from the active block has been
      * sent (i.e., atEndOfBlock() is true).
      *
-     * @param start Physical address to copy from.
-     * @param dst Physical address to copy to.
-     * @param size Size of the block to copy.
+     * @param lut (Reference to) the address translation lut.
+     * @param scattering Direction flag (true: scattering, false: gathering).
      */
-    void startFill(Addr start, Addr dst, size_t size);
+    void startFill(const amap_t &lut, bool scattering);
 
     /**
      * Stop the DMA engine.
@@ -271,7 +274,10 @@ class SgaDmaFifo : public Drainable, public Serializable
      * Has the DMA engine sent out the last request for the active
      * block?
      */
-    bool atEndOfBlock() const { return nextAddr == endAddr; }
+    bool atEndOfBlock() const
+    {
+        return (!lutPtr || nextEntry == lutPtr->end());
+    }
 
     /**
      * Is the DMA engine active (i.e., are there still in-flight
@@ -372,12 +378,9 @@ class SgaDmaFifo : public Drainable, public Serializable
   private: // Internal state
     Fifo<uint8_t> buffer;
 
-    Addr nextAddr = 0;
-    Addr endAddr = 0;
-
-    /** -- SGA-DMA Additions --. */
-    Addr dstAddr = 0;
-    /** -----------------------. */
+    const amap_t *lutPtr = nullptr;
+    bool scattering = false;
+    amap_it_t nextEntry;
 
     std::deque<SgaDmaDoneEventUPtr> pendingRequests;
     std::deque<SgaDmaDoneEventUPtr> freeRequests;

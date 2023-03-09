@@ -88,9 +88,14 @@ SgaDmaPort::handleResp(SgaDmaReqState *state, Addr addr, Addr size, Tick delay,
                        PacketPtr pkt)
 {
     if (pkt && pkt->isRead()) {
-        // To-do: generalize and use createPacket()
+        // To-do: generalize / encapsulate
         const uint8_t *data = pkt->getConstPtr<uint8_t>();
-        Addr dst_addr = state->dst + (addr - state->src);
+        Addr dst_addr;
+        if (state->scattering) {
+            dst_addr = state->lut.to[pkt->getAddr()];
+        } else {
+            dst_addr = state->lut[pkt->getAddr()];
+        }
         RequestPtr dst_req = std::make_shared<Request>(
             dst_addr, size, 0, state->id);
         dst_req->setStreamId(state->sid);
@@ -238,19 +243,22 @@ SgaDmaPort::recvReqRetry()
 }
 
 void
-SgaDmaPort::dmaAction(Addr src, Addr dst, int size, Event *event,
-                      uint8_t *data, uint32_t sid, uint32_t ssid, Tick delay,
+SgaDmaPort::dmaAction(const amap_t &lut, amap_it_t start, uint16_t length,
+                      bool scattering, Event *event, uint8_t *data,
+                      uint32_t sid, uint32_t ssid, Tick delay,
                       Request::Flags flag)
 {
-    DPRINTF(SgaDma, "Starting DMA for addr: %#x size: %d sched: %d\n", src,
-            size, event ? event->scheduled() : -1);
+    DPRINTF(SgaDma, "Starting DMA for addr: %#x size: %d sched: %d mode: %s\n",
+            (scattering ? start->second : start->first),
+            length * sizeof(uint64_t), event ? event->scheduled() : -1,
+            (scattering ? "scattering" : "gathering"));
 
     // One DMA request sender state for every action, that is then
     // split into many requests and packets based on the block size,
     // i.e. cache line size.
     transmitList.push_back(
-            new SgaDmaReqState(src, dst, cacheLineSize, size,
-                data, flag, requestorId, sid, ssid, event, delay));
+            new SgaDmaReqState(lut, start, length, scattering, cacheLineSize,
+                1024, data, flag, requestorId, sid, ssid, event, delay));
     pendingCount++;
 
     // In zero time, also initiate the sending of the packets for the request
@@ -260,11 +268,12 @@ SgaDmaPort::dmaAction(Addr src, Addr dst, int size, Event *event,
 }
 
 void
-SgaDmaPort::dmaAction(Addr src, Addr dst, int size, Event *event,
-                      uint8_t *data, Tick delay, Request::Flags flag)
+SgaDmaPort::dmaAction(const amap_t &lut, amap_it_t start, uint16_t length,
+                      bool scattering, Event *event, uint8_t *data, Tick delay,
+                      Request::Flags flag)
 {
-    dmaAction(src, dst, size, event, data,
-              defaultSid, defaultSSid, delay, flag);
+    dmaAction(lut, start, length, scattering, event, data, defaultSid,
+              defaultSSid, delay, flag);
 }
 
 void
@@ -372,31 +381,29 @@ SgaDmaFifo::~SgaDmaFifo()
 void
 SgaDmaFifo::serialize(CheckpointOut &cp) const
 {
+    panic("Translation LUT and index are not serializable (yet).");
+
     assert(pendingRequests.empty());
 
     SERIALIZE_CONTAINER(buffer);
-    SERIALIZE_SCALAR(endAddr);
-    SERIALIZE_SCALAR(nextAddr);
-    SERIALIZE_SCALAR(dstAddr);
 }
 
 void
 SgaDmaFifo::unserialize(CheckpointIn &cp)
 {
+    panic("Translation LUT and index are not serializable (yet).");
+
     UNSERIALIZE_CONTAINER(buffer);
-    UNSERIALIZE_SCALAR(endAddr);
-    UNSERIALIZE_SCALAR(nextAddr);
-    UNSERIALIZE_SCALAR(dstAddr);
 }
 
 void
-SgaDmaFifo::startFill(Addr start, Addr dst, size_t size)
+SgaDmaFifo::startFill(const amap_t &lut, bool _scattering)
 {
     assert(atEndOfBlock());
 
-    nextAddr = start;
-    endAddr = start + size;
-    dstAddr = dst;
+    lutPtr = &lut;
+    scattering = _scattering;
+    nextEntry = lut.begin();
     resumeFill();
 }
 
@@ -405,7 +412,7 @@ SgaDmaFifo::stopFill()
 {
     // Prevent new DMA requests by setting the next address to the end
     // address. Pending requests will still complete.
-    nextAddr = endAddr;
+    nextEntry = lutPtr->end();
 
     // Flag in-flight accesses as canceled. This prevents their data
     // from being written to the FIFO.
@@ -437,21 +444,23 @@ SgaDmaFifo::resumeFillBypass()
 {
     const size_t fifo_space = buffer.capacity() - buffer.size();
     if (fifo_space >= cacheLineSize || buffer.capacity() < cacheLineSize) {
-        const size_t block_remaining = endAddr - nextAddr;
+        const size_t block_remaining =
+            std::distance(nextEntry, lutPtr->end()) * sizeof(uint64_t);
         const size_t xfer_size = std::min(fifo_space, block_remaining);
         std::vector<uint8_t> tmp_buffer(xfer_size);
 
         assert(pendingRequests.empty());
         DPRINTF(SgaDma, "Direct bypass startAddr=%#x xfer_size=%#x " \
                 "fifo_space=%#x block_remaining=%#x\n",
-                nextAddr, xfer_size, fifo_space, block_remaining);
+                (scattering ? nextEntry->second : nextEntry->first),
+                xfer_size, fifo_space, block_remaining);
 
-        port.dmaAction(nextAddr, dstAddr, xfer_size, nullptr,
+        uint16_t length = xfer_size / sizeof(uint64_t);
+        port.dmaAction(*lutPtr, nextEntry, length, scattering, nullptr,
                        tmp_buffer.data(), 0, reqFlags);
 
-        buffer.write(tmp_buffer.begin(), xfer_size);
-        nextAddr += xfer_size;
-        dstAddr  += xfer_size;
+        //buffer.write(tmp_buffer.begin(), xfer_size);
+        std::advance(nextEntry, length);
     }
 }
 
@@ -463,7 +472,8 @@ SgaDmaFifo::resumeFillTiming()
         size_pending += e->requestSize();
 
     while (!freeRequests.empty() && !atEndOfBlock()) {
-        const size_t req_size(std::min(maxReqSize, endAddr - nextAddr));
+        const size_t req_size(std::min(maxReqSize,
+            std::distance(nextEntry, lutPtr->end()) * sizeof(uint64_t)));
         if (buffer.size() + size_pending + req_size > fifoSize)
             break;
 
@@ -472,10 +482,10 @@ SgaDmaFifo::resumeFillTiming()
         assert(event);
 
         event->reset(req_size);
-        port.dmaAction(nextAddr, dstAddr, req_size, event.get(),
+        uint16_t length = req_size / sizeof(uint64_t);
+        port.dmaAction(*lutPtr, nextEntry, length, scattering, event.get(),
                        event->data(), 0, reqFlags);
-        nextAddr += req_size;
-        dstAddr  += req_size;
+        std::advance(nextEntry, length);
         size_pending += req_size;
 
         pendingRequests.emplace_back(std::move(event));

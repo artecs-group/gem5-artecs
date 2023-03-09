@@ -32,6 +32,7 @@
 
 #include <map>
 
+#include "base/bimap.hh"
 #include "base/types.hh"
 
 namespace gem5
@@ -40,8 +41,8 @@ namespace gem5
 namespace  cat
 {
 
-typedef std::pair<Addr, Addr>  apair_t;
-typedef std::map<Addr, Addr>   amap_t;
+typedef std::pair<Addr, Addr> apair_t;
+typedef codeproject::bimap<Addr, Addr> amap_t;
 typedef amap_t::const_iterator amap_it_t;
 
 /* Operation modes */

@@ -29,6 +29,8 @@ class SgaChunkGenerator
     amap_it_t curEntry;
     /** The iterator corresponding to the next chunk entry point. */
     amap_it_t nextEntry;
+    /** The iterator corresponding to the limit entry point. */
+    amap_it_t endEntry;
     /** The size of the current chunk (in bytes). */
     Addr curSize;
     /** The total number of bytes of the region. */
@@ -37,6 +39,10 @@ class SgaChunkGenerator
     Addr sizeLeft;
     /** The address translation lut. */
     const amap_t &lut;
+    /** The iterator corresponding to the first entry point. */
+    const amap_it_t start;
+    /** The number of entries to process. */
+    const uint16_t length;
     /** Direction flag (true: scattering, false: gathering) */
     const bool scattering;
     /** The maximum chunk size, e.g., the cache block size. */
@@ -52,11 +58,11 @@ class SgaChunkGenerator
     }
 
     void _calcNext() {
-        assert(nextEntry != lut.end());
+        assert(nextEntry != endEntry);
         curEntry = nextEntry;
         curSize = 0;
         Addr pageNum = (curEntry->first / chunkAlign);
-        while (nextEntry != lut.end() && curSize < chunkSize &&
+        while (nextEntry != endEntry && curSize < chunkSize &&
                (nextEntry->first / chunkAlign) == pageNum) {
             curSize += sizeof(uint64_t);
             nextEntry++;
@@ -68,6 +74,8 @@ class SgaChunkGenerator
     /**
      * Constructor.
      * @param _lut (Reference to) the address translation lut.
+     * @param _start The iterator corresponding to the first entry point
+     * @param _length The number of entries to process
      * @param _scattering The scattering direction flag.
      * @param _chunkSize The size of chunks into which
      *    the region should be decomposed.
@@ -76,9 +84,9 @@ class SgaChunkGenerator
      *
      * @ingroup api_chunk_generator
      */
-    SgaChunkGenerator(amap_t &_lut, bool _scattering,
-                      Addr _chunkSize, Addr _chunkAlign) :
-        lut(_lut), scattering(_scattering),
+    SgaChunkGenerator(const amap_t &_lut, amap_it_t _start, uint16_t _length,
+                      bool _scattering, Addr _chunkSize, Addr _chunkAlign) :
+        lut(_lut), start(_start), length(_length), scattering(_scattering),
         chunkSize(_chunkSize), chunkAlign(_chunkAlign)
     {
         // chunkSize must be a power of two
@@ -88,18 +96,20 @@ class SgaChunkGenerator
         assert(chunkAlign == 0 || isPowerOf2(chunkAlign));
 
         // calculate the total size
-        totalSize = lut.size() * sizeof(uint64_t);
+        assert(std::distance(start, lut.end()) >= length);
+        totalSize = length * sizeof(uint64_t);
 
         // initial values
-        nextEntry = lut.begin();
-        sizeLeft = totalSize;
+        nextEntry = start;
+        endEntry  = std::next(start, length);
+        sizeLeft  = totalSize;
 
         // place iterator at beginning of LUT
 
         if (chunkSize == 0) { // Special Case, if we see 0, assume no chunking.
-            curEntry  = lut.begin();
+            curEntry  = start;
             curSize   = totalSize;
-            nextEntry = lut.end();
+            nextEntry = endEntry;
             sizeLeft  = 0;
         } else {
             _calcNext();

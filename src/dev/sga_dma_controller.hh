@@ -116,7 +116,7 @@ class SgaDmaController : public SgaDmaDevice
     params_t currentParams;
 
     /* Address LUT */
-    std::map<Addr, Addr> lut;
+    amap_t lut;
 
     /* Compacted address range (after gathering) */
     std::pair<Addr, Addr> compRange;

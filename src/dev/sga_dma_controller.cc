@@ -216,14 +216,12 @@ bool
 SgaDmaController::startTransfer(bool _scattering)
 {
     if (!running) {
-        Addr src = currentParams.start_addr;
         Addr dst = currentParams.tr_b_addr;
-        Addr len = currentParams.length;
         generateLut(currentParams, lut);
         unsigned bytes = lut.size() * sizeof(uint64_t);
         compRange = std::make_pair(dst, dst + bytes);
         scattering = _scattering;
-        dmaFifo->startFill(src, dst, len);
+        dmaFifo->startFill(lut, _scattering);
         setStatus(true);
         running = true;
         return true;
