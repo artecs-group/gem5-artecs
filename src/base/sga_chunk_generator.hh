@@ -57,7 +57,7 @@ class SgaChunkGenerator
         curSize = 0;
         Addr pageNum = (curEntry->first / chunkAlign);
         while (nextEntry != lut.end() && curSize < chunkSize &&
-               (nextEntry->first / chunkAlign) != pageNum) {
+               (nextEntry->first / chunkAlign) == pageNum) {
             curSize += sizeof(uint64_t);
             nextEntry++;
         }
