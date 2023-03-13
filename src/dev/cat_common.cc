@@ -1,5 +1,6 @@
 #include "dev/cat_common.hh"
 
+#include "base/intmath.hh"
 #include "base/logging.hh"
 
 namespace gem5
@@ -187,6 +188,14 @@ void generateLut(params_t p, amap_t &lut) {
         }
         cur_addr = start_addr;
     }
+}
+
+Addr lkAlign(Addr addr) {
+    return addr & ~((1ULL << ceilLog2(sizeof(uint64_t))) - 1);
+}
+
+uint8_t lkOfs(Addr addr) {
+    return addr % sizeof(uint64_t);
 }
 
 } // namespace cat

@@ -106,11 +106,14 @@ uint64_t getPayload(uint64_t req);
 /* Set parameters according to received request */
 bool setParams(uint64_t req, params_t &p, std::string &cmd_name);
 
-/**
- * Generate an address LUT given the translation parameters.
- * @return the number of bytes of the compacted elements
- */
+/* Generate an address LUT given the translation parameters. */
 void generateLut(params_t p, amap_t &lut);
+
+/* Align the address to word size for lut lookup */
+Addr lkAlign(Addr addr);
+
+/* Get the offset within the word for smaller accesses */
+uint8_t lkOfs(Addr addr);
 
 } // namespace cat
 
