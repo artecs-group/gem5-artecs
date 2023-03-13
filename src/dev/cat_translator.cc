@@ -74,10 +74,12 @@ CAT::lookup(Addr addr)
         readyTimeReg = entries[entry_id].ready_time;
 
         // Second lookup: check if there is an entry in the LUT
-        auto ait = lut.find(addr);
+        Addr addr_alg = addr & ~((1ULL << ceilLog2(sizeof(uint64_t))) - 1);
+        Addr addr_ofs = addr % sizeof(uint64_t);
+        auto ait = lut.find(addr_alg);
         if (ait != lut.end()) {
             DPRINTF(CAT, "Address found in LUT, returning new address\n");
-            responseReg = ait->second;
+            responseReg = ait->second + addr_ofs;
             setStatus(CAT_FOUND);
         } else {
             DPRINTF(CAT, "Address not found in LUT, won't translate\n");
