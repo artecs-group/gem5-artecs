@@ -101,18 +101,7 @@ SgaDmaController::setStatus(bool running)
 void
 SgaDmaController::checkBusy(Addr addr)
 {
-    bool gat = !scattering;
-    if (running) {
-        // Check if the address corresponds to any of the data being written
-        if ((!gat && (addr >= compRange.first && addr < compRange.second)) ||
-            (gat && (lut.find(addr) != lut.end()))) {
-            DPRINTF(SgaDma, "Address is busy, delaying the request\n");
-            setBusyResponse(true);
-        } else {
-            DPRINTF(SgaDma, "Address is available, proceeding\n");
-            setBusyResponse(false);
-        }
-    }
+    // Pending implementation
 }
 
 uint64_t
@@ -216,12 +205,13 @@ bool
 SgaDmaController::startTransfer(bool _scattering)
 {
     if (!running) {
-        Addr dst = currentParams.tr_b_addr;
         generateLut(currentParams, lut);
-        unsigned bytes = lut.size() * sizeof(uint64_t);
-        compRange = std::make_pair(dst, dst + bytes);
+        // (re-)initialize completion flags vector
+        compFlags.clear();
+        compFlags.resize(lut.size(), false);
+        // start the dma transfer based on the lut and direction
         scattering = _scattering;
-        dmaFifo->startFill(lut, _scattering);
+        dmaFifo->startFill(lut, _scattering, compFlags);
         setStatus(true);
         running = true;
         return true;

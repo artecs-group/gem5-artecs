@@ -67,11 +67,14 @@ class SgaDmaPort : public RequestPort, public Drainable
         /** Object to track what chunks of bytes to send at a time. */
         SgaChunkGenerator gen;
 
-        /** The address translation lut. */
+        /** (Reference to) the address translation lut. */
         const amap_t &lut;
 
         /** Direction flag (true: scattering, false: gathering) */
         const bool scattering;
+
+        /** (Reference to) the completion flags vector. */
+        std::vector<bool> &compFlags;
 
         /** Pointer to a buffer for the data. */
         uint8_t *const data = nullptr;
@@ -87,17 +90,21 @@ class SgaDmaPort : public RequestPort, public Drainable
         const uint32_t ssid;
 
         SgaDmaReqState(const amap_t &_lut, amap_it_t start, uint16_t length,
-                       bool _scattering, Addr chunk_sz, Addr chunk_al,
-                       uint8_t *_data, Request::Flags _flags, RequestorID _id,
-                       uint32_t _sid, uint32_t _ssid, Event *ce, Tick _delay)
+                       bool _scattering, std::vector<bool> &comp_flags,
+                       Addr chunk_sz, Addr chunk_al, uint8_t *_data,
+                       Request::Flags _flags, RequestorID _id, uint32_t _sid,
+                       uint32_t _ssid, Event *ce, Tick _delay)
             : completionEvent(ce), totBytes(length * sizeof(uint64_t)),
               delay(_delay),
               gen(_lut, start, length, _scattering, chunk_sz, chunk_al),
-              lut(_lut), scattering(_scattering), data(_data),
-              flags(_flags), id(_id), sid(_sid), ssid(_ssid)
+              lut(_lut), scattering(_scattering), compFlags(comp_flags),
+              data(_data), flags(_flags), id(_id), sid(_sid), ssid(_ssid)
         {}
 
         PacketPtr createPacket();
+
+        /** Set completion flags when a chunk is successfully transferred. */
+        void setCompFlags(Addr start_addr, uint16_t lenght);
     };
 
     /**
@@ -171,13 +178,14 @@ class SgaDmaPort : public RequestPort, public Drainable
 
     void
     dmaAction(const amap_t &lut, amap_it_t start, uint16_t length,
-              bool scattering, Event *event, uint8_t *data, uint32_t sid,
-              uint32_t ssid, Tick delay, Request::Flags flag = 0);
+              bool scattering, std::vector<bool> &comp_flags, Event *event,
+              uint8_t *data, uint32_t sid, uint32_t ssid, Tick delay,
+              Request::Flags flag = 0);
 
     void
     dmaAction(const amap_t &lut, amap_it_t start, uint16_t length,
-              bool scattering, Event *event, uint8_t *data, Tick delay,
-              Request::Flags flag = 0);
+              bool scattering, std::vector<bool> &comp_flags, Event *event,
+              uint8_t *data, Tick delay, Request::Flags flag = 0);
 
     bool dmaPending() const { return pendingCount > 0; }
 
@@ -257,8 +265,10 @@ class SgaDmaFifo : public Drainable, public Serializable
      *
      * @param lut (Reference to) the address translation lut.
      * @param scattering Direction flag (true: scattering, false: gathering).
+     * @param comp_flags (Reference to) the completion flags vector.
      */
-    void startFill(const amap_t &lut, bool scattering);
+    void startFill(const amap_t &lut, bool scattering,
+                   std::vector<bool> &comp_flags);
 
     /**
      * Stop the DMA engine.
@@ -379,6 +389,7 @@ class SgaDmaFifo : public Drainable, public Serializable
     Fifo<uint8_t> buffer;
 
     const amap_t *lutPtr = nullptr;
+    std::vector<bool> *compFlagsPtr = nullptr;
     bool scattering = false;
     amap_it_t nextEntry;
 

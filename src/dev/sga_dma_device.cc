@@ -127,6 +127,9 @@ SgaDmaPort::handleResp(SgaDmaReqState *state, Addr addr, Addr size, Tick delay,
     state->numBytes += size;
     assert(state->totBytes >= state->numBytes);
 
+    // Update completion flags
+    state->setCompFlags(pkt->getAddr(), pkt->getSize() / sizeof(uint64_t));
+
     // If we have reached the total number of bytes for this DMA request,
     // then signal the completion and delete the sate.
     if (state->totBytes == state->numBytes) {
@@ -160,6 +163,23 @@ SgaDmaPort::SgaDmaReqState::createPacket()
 
     pkt->senderState = this;
     return pkt;
+}
+
+void
+SgaDmaPort::SgaDmaReqState::setCompFlags(Addr start_addr, uint16_t length)
+{
+    unsigned index;
+    if (scattering) {
+        index = std::distance(lut.begin(), lut.find(start_addr));
+    } else {
+        index = std::distance(lut.to.begin(), lut.to.find(start_addr));
+    }
+
+    assert(index + length <= compFlags.size());
+    for (unsigned i = 0; i < length; i++) {
+        assert(!compFlags[index + i]);
+        compFlags[index + i] = true;
+    }
 }
 
 bool
@@ -244,9 +264,9 @@ SgaDmaPort::recvReqRetry()
 
 void
 SgaDmaPort::dmaAction(const amap_t &lut, amap_it_t start, uint16_t length,
-                      bool scattering, Event *event, uint8_t *data,
-                      uint32_t sid, uint32_t ssid, Tick delay,
-                      Request::Flags flag)
+                      bool scattering, std::vector<bool> &comp_flags,
+                      Event *event, uint8_t *data, uint32_t sid, uint32_t ssid,
+                      Tick delay, Request::Flags flag)
 {
     DPRINTF(SgaDma, "Starting DMA for addr: %#x size: %d sched: %d mode: %s\n",
             (scattering ? start->second : start->first),
@@ -257,8 +277,9 @@ SgaDmaPort::dmaAction(const amap_t &lut, amap_it_t start, uint16_t length,
     // split into many requests and packets based on the block size,
     // i.e. cache line size.
     transmitList.push_back(
-            new SgaDmaReqState(lut, start, length, scattering, cacheLineSize,
-                1024, data, flag, requestorId, sid, ssid, event, delay));
+            new SgaDmaReqState(lut, start, length, scattering, comp_flags,
+                               cacheLineSize, 1024, data, flag, requestorId,
+                               sid, ssid, event, delay));
     pendingCount++;
 
     // In zero time, also initiate the sending of the packets for the request
@@ -269,11 +290,12 @@ SgaDmaPort::dmaAction(const amap_t &lut, amap_it_t start, uint16_t length,
 
 void
 SgaDmaPort::dmaAction(const amap_t &lut, amap_it_t start, uint16_t length,
-                      bool scattering, Event *event, uint8_t *data, Tick delay,
+                      bool scattering, std::vector<bool> &comp_flags,
+                      Event *event, uint8_t *data, Tick delay,
                       Request::Flags flag)
 {
-    dmaAction(lut, start, length, scattering, event, data, defaultSid,
-              defaultSSid, delay, flag);
+    dmaAction(lut, start, length, scattering, comp_flags, event, data,
+              defaultSid, defaultSSid, delay, flag);
 }
 
 void
@@ -397,12 +419,15 @@ SgaDmaFifo::unserialize(CheckpointIn &cp)
 }
 
 void
-SgaDmaFifo::startFill(const amap_t &lut, bool _scattering)
+SgaDmaFifo::startFill(const amap_t &lut, bool _scattering,
+                      std::vector<bool> &compFlags)
 {
     assert(atEndOfBlock());
 
     lutPtr = &lut;
     scattering = _scattering;
+    compFlagsPtr = &compFlags;
+
     nextEntry = lut.begin();
     resumeFill();
 }
@@ -456,8 +481,8 @@ SgaDmaFifo::resumeFillBypass()
                 xfer_size, fifo_space, block_remaining);
 
         uint16_t length = xfer_size / sizeof(uint64_t);
-        port.dmaAction(*lutPtr, nextEntry, length, scattering, nullptr,
-                       tmp_buffer.data(), 0, reqFlags);
+        port.dmaAction(*lutPtr, nextEntry, length, scattering, *compFlagsPtr,
+                       nullptr, tmp_buffer.data(), 0, reqFlags);
 
         //buffer.write(tmp_buffer.begin(), xfer_size);
         std::advance(nextEntry, length);
@@ -483,8 +508,8 @@ SgaDmaFifo::resumeFillTiming()
 
         event->reset(req_size);
         uint16_t length = req_size / sizeof(uint64_t);
-        port.dmaAction(*lutPtr, nextEntry, length, scattering, event.get(),
-                       event->data(), 0, reqFlags);
+        port.dmaAction(*lutPtr, nextEntry, length, scattering, *compFlagsPtr,
+                       event.get(), event->data(), 0, reqFlags);
         std::advance(nextEntry, length);
         size_pending += req_size;
 

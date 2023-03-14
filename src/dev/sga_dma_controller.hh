@@ -118,8 +118,8 @@ class SgaDmaController : public SgaDmaDevice
     /* Address LUT */
     amap_t lut;
 
-    /* Compacted address range (after gathering) */
-    std::pair<Addr, Addr> compRange;
+    /* Completion flags vector */
+    std::vector<bool> compFlags;
 
     /* Event triggered at the end of a DMA transfer */
     EventFunctionWrapper *eotEvent;
