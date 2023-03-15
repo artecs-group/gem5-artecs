@@ -9,6 +9,8 @@ class SgaDmaDevice(PioDevice):
     abstract = True
 
     dma = RequestPort("DMA port")
+    mmem_rowbuffer_size = Param.MemorySize(
+        "Main memory page (row buffer) size")
 
     _iommu = None
 

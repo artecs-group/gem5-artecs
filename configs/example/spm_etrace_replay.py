@@ -135,12 +135,21 @@ system.system_port = system.membus.cpu_side_ports
 CacheConfig.config_cache(args, system, True)
 MemConfig.config_mem(args, system)
 
+mem_ctrl = system.mem_ctrls[0]
+if getattr(mem_ctrl, "dram", False):
+    rb_size = mem_ctrl.dram.device_rowbuffer_size
+elif getattr(mem_ctrl, "nvm", False):
+    rb_size = mem_ctrl.nvm.device_rowbuffer_size
+else:
+    fatal("Memory interface type not supported\n")
+
 # Override dcache address range
 system.cpu.dcache.addr_ranges = [AddrRange(0, args.mem_size)]
 
 # SPM-related configuration
 system.translator = CAT(pio_addr = 0x2000000000)
-system.dmac = SgaDmaController(pio_addr = 0x3000000000)
+system.dmac = SgaDmaController(pio_addr = 0x3000000000,
+                               mmem_rowbuffer_size = rb_size)
 system.hub = TranslatingXBar(width = 8,
                              translator_port = system.translator.pio,
                              dmac_port = system.dmac.pio)

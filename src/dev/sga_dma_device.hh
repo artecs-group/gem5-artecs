@@ -132,6 +132,9 @@ class SgaDmaPort : public RequestPort, public Drainable
     /** Id for all requests */
     const RequestorID requestorId;
 
+    /** Main memory page (row buffer) size, used as DMA chunk boundary */
+    const uint16_t mmemRowBufferSize;
+
   protected:
     /** Use a deque as we never do any insertion or removal in the middle */
     std::deque<SgaDmaReqState *> transmitList;
@@ -174,7 +177,8 @@ class SgaDmaPort : public RequestPort, public Drainable
 
   public:
 
-    SgaDmaPort(ClockedObject *dev, System *s, uint32_t sid=0, uint32_t ssid=0);
+    SgaDmaPort(ClockedObject *dev, System *s, uint16_t mmem_rowbuffer_size,
+               uint32_t sid = 0, uint32_t ssid = 0);
 
     void
     dmaAction(const amap_t &lut, amap_it_t start, uint16_t length,

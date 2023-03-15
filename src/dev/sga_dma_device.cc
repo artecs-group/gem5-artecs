@@ -59,9 +59,10 @@ namespace cat
 {
 
 SgaDmaPort::SgaDmaPort(ClockedObject *dev, System *s,
-                 uint32_t sid, uint32_t ssid)
+    uint16_t mmem_rowbuffer_size, uint32_t sid, uint32_t ssid)
     : RequestPort(dev->name() + ".dma", dev),
       device(dev), sys(s), requestorId(s->getRequestorId(dev)),
+      mmemRowBufferSize(mmem_rowbuffer_size),
       sendEvent([this]{ sendDma(); }, dev->name()),
       sendDestEvent([this]{ sendDest(); }, dev->name()),
       sendDestFail(false), countRetries(0),
@@ -195,7 +196,7 @@ SgaDmaPort::recvTimingResp(PacketPtr pkt)
 }
 
 SgaDmaDevice::SgaDmaDevice(const Params &p)
-    : PioDevice(p), dmaPort(this, sys, p.sid, p.ssid)
+    : PioDevice(p), dmaPort(this, sys, p.mmem_rowbuffer_size, p.sid, p.ssid)
 { }
 
 void
@@ -278,8 +279,8 @@ SgaDmaPort::dmaAction(const amap_t &lut, amap_it_t start, uint16_t length,
     // i.e. cache line size.
     transmitList.push_back(
             new SgaDmaReqState(lut, start, length, scattering, comp_flags,
-                               cacheLineSize, 1024, data, flag, requestorId,
-                               sid, ssid, event, delay));
+                               cacheLineSize, mmemRowBufferSize, data, flag,
+                               requestorId, sid, ssid, event, delay));
     pendingCount++;
 
     // In zero time, also initiate the sending of the packets for the request
