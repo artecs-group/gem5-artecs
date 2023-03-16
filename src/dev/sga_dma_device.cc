@@ -149,7 +149,7 @@ SgaDmaPort::handleResp(SgaDmaReqState *state, Addr addr, Addr size, Tick delay,
 }
 
 PacketPtr
-SgaDmaPort::SgaDmaReqState::createPacket()
+SgaDmaReqState::createPacket()
 {
     RequestPtr req = std::make_shared<Request>(
             gen.addr(), gen.size(), flags, id);
@@ -167,7 +167,7 @@ SgaDmaPort::SgaDmaReqState::createPacket()
 }
 
 void
-SgaDmaPort::SgaDmaReqState::setCompFlags(Addr start_addr, uint16_t length)
+SgaDmaReqState::setCompFlags(Addr start_addr, uint16_t length)
 {
     unsigned index;
     if (scattering) {

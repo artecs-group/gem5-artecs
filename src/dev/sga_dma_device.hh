@@ -28,6 +28,64 @@ class ClockedObject;
 namespace cat
 {
 
+struct SgaDmaReqState : public Packet::SenderState
+{
+    /** Event to call on the device when this transaction (all packets)
+     * complete. */
+    Event *completionEvent;
+
+    /** Total number of bytes that this transaction involves. */
+    const Addr totBytes;
+
+    /** Number of bytes that have been acked for this transaction. */
+    Addr numBytes = 0;
+
+    /** Amount to delay completion of dma by */
+    const Tick delay;
+
+    /** Object to track what chunks of bytes to send at a time. */
+    SgaChunkGenerator gen;
+
+    /** (Reference to) the address translation lut. */
+    const amap_t &lut;
+
+    /** Direction flag (true: scattering, false: gathering) */
+    const bool scattering;
+
+    /** (Reference to) the completion flags vector. */
+    std::vector<bool> &compFlags;
+
+    /** Pointer to a buffer for the data. */
+    uint8_t *const data = nullptr;
+
+    /** The flags to use for requests. */
+    const Request::Flags flags;
+
+    /** The requestor ID to use for requests. */
+    const RequestorID id;
+
+    /** Stream IDs. */
+    const uint32_t sid;
+    const uint32_t ssid;
+
+    SgaDmaReqState(const amap_t &_lut, amap_it_t start, uint16_t length,
+                    bool _scattering, std::vector<bool> &comp_flags,
+                    Addr chunk_sz, Addr chunk_al, uint8_t *_data,
+                    Request::Flags _flags, RequestorID _id, uint32_t _sid,
+                    uint32_t _ssid, Event *ce, Tick _delay)
+        : completionEvent(ce), totBytes(length * sizeof(uint64_t)),
+          delay(_delay),
+          gen(_lut, start, length, _scattering, chunk_sz, chunk_al),
+          lut(_lut), scattering(_scattering), compFlags(comp_flags),
+          data(_data), flags(_flags), id(_id), sid(_sid), ssid(_ssid)
+    {}
+
+    PacketPtr createPacket();
+
+    /** Set completion flags when a chunk is successfully transferred. */
+    void setCompFlags(Addr start_addr, uint16_t lenght);
+};
+
 class SgaDmaPort : public RequestPort, public Drainable
 {
   private:
@@ -48,64 +106,6 @@ class SgaDmaPort : public RequestPort, public Drainable
      * list.
      */
     void sendDma();
-
-    struct SgaDmaReqState : public Packet::SenderState
-    {
-        /** Event to call on the device when this transaction (all packets)
-         * complete. */
-        Event *completionEvent;
-
-        /** Total number of bytes that this transaction involves. */
-        const Addr totBytes;
-
-        /** Number of bytes that have been acked for this transaction. */
-        Addr numBytes = 0;
-
-        /** Amount to delay completion of dma by */
-        const Tick delay;
-
-        /** Object to track what chunks of bytes to send at a time. */
-        SgaChunkGenerator gen;
-
-        /** (Reference to) the address translation lut. */
-        const amap_t &lut;
-
-        /** Direction flag (true: scattering, false: gathering) */
-        const bool scattering;
-
-        /** (Reference to) the completion flags vector. */
-        std::vector<bool> &compFlags;
-
-        /** Pointer to a buffer for the data. */
-        uint8_t *const data = nullptr;
-
-        /** The flags to use for requests. */
-        const Request::Flags flags;
-
-        /** The requestor ID to use for requests. */
-        const RequestorID id;
-
-        /** Stream IDs. */
-        const uint32_t sid;
-        const uint32_t ssid;
-
-        SgaDmaReqState(const amap_t &_lut, amap_it_t start, uint16_t length,
-                       bool _scattering, std::vector<bool> &comp_flags,
-                       Addr chunk_sz, Addr chunk_al, uint8_t *_data,
-                       Request::Flags _flags, RequestorID _id, uint32_t _sid,
-                       uint32_t _ssid, Event *ce, Tick _delay)
-            : completionEvent(ce), totBytes(length * sizeof(uint64_t)),
-              delay(_delay),
-              gen(_lut, start, length, _scattering, chunk_sz, chunk_al),
-              lut(_lut), scattering(_scattering), compFlags(comp_flags),
-              data(_data), flags(_flags), id(_id), sid(_sid), ssid(_ssid)
-        {}
-
-        PacketPtr createPacket();
-
-        /** Set completion flags when a chunk is successfully transferred. */
-        void setCompFlags(Addr start_addr, uint16_t lenght);
-    };
 
     /**
      * Handle a response packet by updating the corresponding DMA
