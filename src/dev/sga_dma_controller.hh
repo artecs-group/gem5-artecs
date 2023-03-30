@@ -115,13 +115,19 @@ class SgaDmaController : public SgaDmaDevice
     /* Current parameters */
     params_t currentParams;
 
+    /* Flag set when some data have been requested during transfer */
+    bool conflict;
+
     /* Address LUT */
     amap_t lut;
 
     /* Completion flags vector */
     std::vector<bool> compFlags;
 
-    /* Event triggered at the end of a DMA transfer */
+    /* Event triggered at the end of a DMA chunk transfer */
+    EventFunctionWrapper *eocEvent;
+
+    /* Event triggered at the end of a DMA transfer (all chunks) */
     EventFunctionWrapper *eotEvent;
 
     /* Decode the direction of a start request */
@@ -145,7 +151,10 @@ class SgaDmaController : public SgaDmaDevice
     bool startTransfer(bool _scattering);
     bool stopTransfer();
 
-    /* Callback of eobEvent to update the status */
+    /* Callback of eocEvent to retry conflicting requests */
+    void eocCallback();
+
+    /* Callback of eotEvent to update the running status */
     void eotCallback();
 
   public:

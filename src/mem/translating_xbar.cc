@@ -192,8 +192,6 @@ TranslatingXBar::recvTimingReq(PacketPtr pkt, PortID cpu_side_port_id)
             DPRINTF(TranslatingXBar, "Found DMAC programming command\n");
             pkt->setAddr(dmac_base_addr);
             pkt->set(data, ByteOrder::little);
-        } else if (high_bits == 0b100) {
-            DPRINTF(TranslatingXBar, "Found DMAC completion signal\n");
         }
     }
 
@@ -257,10 +255,9 @@ TranslatingXBar::recvTimingReq(PacketPtr pkt, PortID cpu_side_port_id)
             break;
         }
 
-        /*
         // check if any dma transfer is in progress for the required address
         // - query
-        q_pkt = createPacket(MemCmd::WriteReq, dmac_base_addr, pkt->getAddr());
+        q_pkt = createPacket(MemCmd::WriteReq, dmac_base_addr, pkt_addr);
         memSidePorts[dmacPortID]->sendFunctional(q_pkt);
         delete q_pkt;
         // - response
@@ -269,11 +266,12 @@ TranslatingXBar::recvTimingReq(PacketPtr pkt, PortID cpu_side_port_id)
         memSidePorts[dmacPortID]->sendFunctional(q_pkt);
         uint64_t q_busy = q_pkt->getUintX(ByteOrder::little);
         delete q_pkt;
-        if ((q_busy >> 4) & 0xf) {
-            panic("ADDRESS IS BUSY");
+        if (((q_busy >> 4) & 0xf) == 0xf) {
+            DPRINTF(TranslatingXBar, "Address %#x is currently involved in a "
+                    "DMA transfer, postponing request\n", pkt_addr);
+            busyList.emplace_back(pkt);
+            return true;
         }
-        */
-
     }
 
     // test if the layer should be considered occupied for the current
@@ -461,6 +459,21 @@ TranslatingXBar::recvFunctional(PacketPtr pkt, PortID cpu_side_port_id)
                 "recvFunctional: packet src %s addr 0x%x cmd %s\n",
                 cpuSidePorts[cpu_side_port_id]->name(), pkt->getAddr(),
                 pkt->cmdString());
+    }
+
+    uint8_t high_bits = pkt->getAddr() >> 61;
+    if (high_bits && pkt->isWrite()) {
+        if (high_bits == 0b100) {
+            DPRINTF(TranslatingXBar, "Found DMAC chunk completion signal\n");
+            PacketList pendingRetry(busyList);
+            busyList.clear();
+            for (PacketPtr const& p : pendingRetry) {
+                DPRINTF(TranslatingXBar, "Retrying request targeting address "
+                    "%#x, blocked by DMA transfer\n", p->getAddr());
+                recvTimingReq(p, cpu_side_port_id);
+            }
+            return;
+        }
     }
 
     // since our CPU-side ports are queued ports we need to check them as well

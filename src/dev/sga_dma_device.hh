@@ -55,6 +55,9 @@ struct SgaDmaReqState : public Packet::SenderState
     /** (Reference to) the completion flags vector. */
     std::vector<bool> &compFlags;
 
+    /** Chunk completion event */
+    Event *chunkCompleteEvent;
+
     /** Pointer to a buffer for the data. */
     uint8_t *const data = nullptr;
 
@@ -69,15 +72,16 @@ struct SgaDmaReqState : public Packet::SenderState
     const uint32_t ssid;
 
     SgaDmaReqState(const amap_t &_lut, amap_it_t start, uint16_t length,
-                    bool _scattering, std::vector<bool> &comp_flags,
-                    Addr chunk_sz, Addr chunk_al, uint8_t *_data,
-                    Request::Flags _flags, RequestorID _id, uint32_t _sid,
-                    uint32_t _ssid, Event *ce, Tick _delay)
+                   bool _scattering, std::vector<bool> &comp_flags,
+                   Event *chk_event, Addr chunk_sz, Addr chunk_al,
+                   uint8_t *_data, Request::Flags _flags, RequestorID _id,
+                   uint32_t _sid, uint32_t _ssid, Event *ce, Tick _delay)
         : completionEvent(ce), totBytes(length * sizeof(uint64_t)),
           delay(_delay),
           gen(_lut, start, length, _scattering, chunk_sz, chunk_al),
           lut(_lut), scattering(_scattering), compFlags(comp_flags),
-          data(_data), flags(_flags), id(_id), sid(_sid), ssid(_ssid)
+          chunkCompleteEvent(chk_event), data(_data), flags(_flags), id(_id),
+          sid(_sid), ssid(_ssid)
     {}
 
     PacketPtr createPacket();
@@ -183,13 +187,14 @@ class SgaDmaPort : public RequestPort, public Drainable
     void
     dmaAction(const amap_t &lut, amap_it_t start, uint16_t length,
               bool scattering, std::vector<bool> &comp_flags, Event *event,
-              uint8_t *data, uint32_t sid, uint32_t ssid, Tick delay,
-              Request::Flags flag = 0);
+              Event *chk_event, uint8_t *data, uint32_t sid, uint32_t ssid,
+              Tick delay, Request::Flags flag = 0);
 
     void
     dmaAction(const amap_t &lut, amap_it_t start, uint16_t length,
               bool scattering, std::vector<bool> &comp_flags, Event *event,
-              uint8_t *data, Tick delay, Request::Flags flag = 0);
+              Event *chk_event, uint8_t *data, Tick delay,
+              Request::Flags flag = 0);
 
     bool dmaPending() const { return pendingCount > 0; }
 
@@ -319,6 +324,14 @@ class SgaDmaFifo : public Drainable, public Serializable
     virtual void onEndOfBlock() {};
 
     /**
+     * Chunk complete callback
+     *
+     * This callback is called after a chunk has been successfully read from
+     * the origin device and written to the destination.
+     */
+    virtual void onChunkComplete() {};
+
+    /**
      * Last response received callback
      *
      * This callback is called when the DMA engine becomes idle (i.e.,
@@ -345,6 +358,16 @@ class SgaDmaFifo : public Drainable, public Serializable
     const int cacheLineSize;
 
   private:
+    class SgaDmaChunkEvent : public Event
+    {
+      public:
+        SgaDmaChunkEvent(SgaDmaFifo *_parent);
+        void process();
+
+      private:
+        SgaDmaFifo *parent;
+    };
+
     class SgaDmaDoneEvent : public Event
     {
       public:
@@ -369,7 +392,11 @@ class SgaDmaFifo : public Drainable, public Serializable
         std::vector<uint8_t> _data;
     };
 
+    typedef std::unique_ptr<SgaDmaChunkEvent> SgaDmaChunkEventUPtr;
     typedef std::unique_ptr<SgaDmaDoneEvent> SgaDmaDoneEventUPtr;
+
+    /** Execute when a chunk is successfully transferred. */
+    void chunkComplete();
 
     /**
      * DMA request done, handle incoming data and issue new
@@ -397,6 +424,7 @@ class SgaDmaFifo : public Drainable, public Serializable
     bool scattering = false;
     amap_it_t nextEntry;
 
+    SgaDmaChunkEventUPtr chunkCompleteEvent;
     std::deque<SgaDmaDoneEventUPtr> pendingRequests;
     std::deque<SgaDmaDoneEventUPtr> freeRequests;
 };
@@ -405,7 +433,9 @@ class SgaDmaCbFifo : public SgaDmaFifo
 {
   private:
     ClockedObject *owner;
+    Event *eocEvent;
     Event *eotEvent;
+    void onChunkComplete() override;
     void onIdle() override;
 
   public:
@@ -414,6 +444,7 @@ class SgaDmaCbFifo : public SgaDmaFifo
                  unsigned max_req_size,
                  unsigned max_pending,
                  Request::Flags flags = 0,
+                 Event *eoc_event = nullptr,
                  Event *eot_event = nullptr);
 };
 

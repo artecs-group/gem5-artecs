@@ -19,18 +19,20 @@ SgaDmaController::SgaDmaController(const Params &params) :
     responseReg(0),
     statusReg(0),
     running(false),
-    scattering(false)
+    scattering(false),
+    conflict(false)
 {
-    eotEvent = new EventFunctionWrapper([this]{ eotCallback(); }, name(),
-                                        true);
+    eocEvent = new EventFunctionWrapper([this]{ eocCallback(); }, name());
+    eotEvent = new EventFunctionWrapper([this]{ eotCallback(); }, name());
     dmaFifo  = new SgaDmaCbFifo(this, dmaPort, 1024, 64, 8,
-                                Request::UNCACHEABLE, eotEvent);
+                                Request::UNCACHEABLE, eocEvent, eotEvent);
 }
 
 SgaDmaController::~SgaDmaController()
 {
     delete(dmaFifo);
     delete(eotEvent);
+    delete(eocEvent);
 }
 
 AddrRangeList
@@ -101,7 +103,35 @@ SgaDmaController::setStatus(bool running)
 void
 SgaDmaController::checkBusy(Addr addr)
 {
-    // Pending implementation
+    // Note 1: Assume the access being checked is a not a strided one.
+    // Note 2: The completion flags are set per chunk, which typically
+    //         has a size equal or larger than the cache line.
+    uint16_t index;
+    Addr lk_addr = 0;
+
+    if (scattering) {
+        auto it = lut.lower_bound(lkAlign(addr));
+        index = std::distance(lut.begin(), it);
+        if (index < lut.size()) {
+            lk_addr = it->first;
+        }
+    } else {
+        auto it = lut.to.lower_bound(lkAlign(addr));
+        index = std::distance(lut.to.begin(), it);
+        if (index < lut.size()) {
+            lk_addr = it->second;
+        }
+    }
+
+    if (lk_addr && (lk_addr - addr < 64) && !compFlags[index]) {
+        DPRINTF(SgaDma, "Address is BUSY\n");
+        conflict = true;
+        setBusyResponse(true);
+        return;
+    }
+
+    DPRINTF(SgaDma, "Address is NOT BUSY\n");
+    setBusyResponse(false);
 }
 
 uint64_t
@@ -167,9 +197,11 @@ SgaDmaController::regWrite(Addr addr, uint64_t data)
 
     switch(cmd) {
       case CAT_NO_COMMAND:
-        DPRINTF(SgaDma, "No command received, checking if requested address " \
-                "%#x is available\n", payload);
-        checkBusy(payload);
+        if (running) {
+            DPRINTF(SgaDma, "No command received, checking if requested "
+                    "address %#x is available\n", payload);
+            checkBusy(payload);
+        }
         break;
 
       case CAT_START_STOP:
@@ -228,6 +260,21 @@ SgaDmaController::stopTransfer()
         return true;
     }
     return false;
+}
+
+void
+SgaDmaController::eocCallback()
+{
+    if (conflict) {
+        // Send a custom "retry packet" through dmaPort
+        RequestPtr req = std::make_shared<Request>(0x8000000000000000,
+            sizeof(uint64_t), 0, Request::funcRequestorId);
+        PacketPtr pkt = new Packet(req, MemCmd::WriteReq);
+        DPRINTF(SgaDma, "DMA chunk complete, signaling TranslatingXBar\n");
+        dmaPort.sendFunctional(pkt);
+        delete pkt;
+    }
+    conflict = false;
 }
 
 void
