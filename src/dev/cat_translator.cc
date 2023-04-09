@@ -142,11 +142,11 @@ CAT::CATRegRead(Addr addr, Tick &delay)
         break;
       case CAT_RESP_REG:
         r = responseReg;
-        DPRINTF(CAT, "Reading CAT_RESP_REG: %#x\n", r);
+        //DPRINTF(CAT, "Reading CAT_RESP_REG: %#x\n", r);
         break;
       case CAT_RDY_REG:
         r = readyTimeReg;
-        DPRINTF(CAT, "Reading CAT_RDY_REG: %#x\n", r);
+        //DPRINTF(CAT, "Reading CAT_RDY_REG: %#x\n", r);
         break;
       default:
         r = -1;
@@ -162,7 +162,7 @@ CAT::CATRegWrite(Addr addr, uint64_t data, Tick &delay)
     bool process_req = false;
     switch (addr / sizeof(uint64_t)) {
       case CAT_REQ_REG:
-        DPRINTF(CAT, "Writing CAT_REQ_REG: %#x\n", data);
+        //DPRINTF(CAT, "Writing CAT_REQ_REG: %#x\n", data);
         process_req = true;
         break;
       case CAT_RESP_REG:
@@ -240,12 +240,12 @@ CAT::read(PacketPtr pkt)
 
     Addr cat_addr = pkt_addr - pioAddr;
 
-    DPRINTF(CAT,
-        "Read request - addr: %#x, size: %#x\n", cat_addr, pkt->getSize());
+    //DPRINTF(CAT,
+    //    "Read request - addr: %#x, size: %#x\n", cat_addr, pkt->getSize());
 
     Tick delay = 0;
     uint64_t read = CATRegRead(cat_addr, delay);
-    DPRINTF(CAT, "Packet Read: %#x\n", read);
+    //DPRINTF(CAT, "Packet Read: %#x\n", read);
     pkt->setUintX(read, byteOrder);
     pkt->makeResponse();
 
@@ -263,12 +263,12 @@ CAT::write(PacketPtr pkt)
 
     Addr cat_addr = pkt_addr - pioAddr;
 
-    DPRINTF(CAT, "Write register %#x value %#x\n", cat_addr,
-            pkt->getUintX(byteOrder));
+    //DPRINTF(CAT, "Write register %#x value %#x\n", cat_addr,
+    //        pkt->getUintX(byteOrder));
 
     Tick delay = 0;
     CATRegWrite(cat_addr, pkt->getUintX(byteOrder), delay);
-    DPRINTF(CAT, "Packet Write Value: %d\n", pkt->getUintX(byteOrder));
+    //DPRINTF(CAT, "Packet Write Value: %d\n", pkt->getUintX(byteOrder));
 
     pkt->makeResponse();
 
