@@ -84,8 +84,8 @@ CAT::lookup(Addr addr)
             setStatus(CAT_NOT_FOUND);
         }
     } else {
-        DPRINTF(CAT, "Address %#x does not belong to any mapped range\n",
-                addr);
+        //DPRINTF(CAT, "Address %#x does not belong to any mapped range\n",
+        //        addr);
         setStatus(CAT_NOT_MAPPED);
     }
 }
@@ -194,7 +194,7 @@ CAT::CATRegWrite(Addr addr, uint64_t data, Tick &delay)
 
     switch(cmd) {
       case CAT_NO_COMMAND:
-        DPRINTF(CAT, "No command received, performing normal lookup\n");
+        //DPRINTF(CAT, "No command received, performing normal lookup\n");
         lookup((Addr)payload);
         // Warning: lookup latency is ignored for now: using functional access
         delay = cyclesToTicks(lookupLat);
