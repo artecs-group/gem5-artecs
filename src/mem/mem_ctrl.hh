@@ -542,6 +542,8 @@ class MemCtrl : public qos::MemCtrl
         // All statistics that the model needs to capture
         statistics::Scalar readReqs;
         statistics::Scalar writeReqs;
+        statistics::Scalar patReadReqs;
+        statistics::Scalar patWriteReqs;
         statistics::Scalar readBursts;
         statistics::Scalar writeBursts;
         statistics::Scalar servicedByWrQ;

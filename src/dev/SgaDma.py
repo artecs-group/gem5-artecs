@@ -17,7 +17,7 @@ class SgaDmaDevice(PioDevice):
     sid = Param.Unsigned(0,
         "Stream identifier used by an IOMMU to distinguish amongst "
         "several devices attached to it")
-    ssid = Param.Unsigned(0,
+    ssid = Param.Unsigned(742,
         "Substream identifier used by an IOMMU to distinguish amongst "
         "several devices attached to it")
 
