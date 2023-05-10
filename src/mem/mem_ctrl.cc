@@ -215,9 +215,13 @@ MemCtrl::addToReadQueue(PacketPtr pkt, unsigned int pkt_count, bool is_dram)
     unsigned pktsServicedByWrQ = 0;
     BurstHelper* burst_helper = NULL;
 
+    uint32_t burst_size = is_dram ? dram->bytesPerBurst() :
+                                    nvm->bytesPerBurst();
+
     // Check if it is a pattern request from SGA-DMA
     bool pattern = false;
     cat::amap_it_t lut_index, lut_end;
+    std::vector<uint16_t> pat_bytes;
     if (pkt->req->taskId() == context_switch_task_id::DMA &&
         pkt->req->substreamId() == 742) {
         pattern = true;
@@ -228,20 +232,32 @@ MemCtrl::addToReadQueue(PacketPtr pkt, unsigned int pkt_count, bool is_dram)
 
         // Get the LUT address index
         // (note: assume that DMA request are already word-aligned)
+        uint16_t length = pkt->getSize() / sizeof(uint64_t);
         lut_index = state->lut.find(base_addr);
-        lut_end   = state->lut.end();
+        lut_end   = std::next(lut_index, length);
         assert(lut_index != lut_end);
 
         // Split packet in multiple sub-packets, overwriting pkt_count
-        pkt_count = pkt->getSize() / sizeof(uint64_t);
+        unsigned int sga_dma_pkt_count = 1;
+        unsigned int count_items = 0;
+        Addr burst_idx = lut_index->first / burst_size;
+        for (auto i = lut_index; i != lut_end; i++) {
+            if ((i->first / burst_size) != burst_idx) {
+                burst_idx = i->first / burst_size;
+                sga_dma_pkt_count++;
+                pat_bytes.emplace_back(count_items * sizeof(uint64_t));
+                count_items = 0;
+            }
+            count_items++;
+        }
+        pat_bytes.emplace_back(count_items * sizeof(uint64_t));
+        pkt_count = sga_dma_pkt_count;
     }
 
-    uint32_t burst_size = is_dram ? dram->bytesPerBurst() :
-                                    nvm->bytesPerBurst();
     for (int cnt = 0; cnt < pkt_count; ++cnt) {
         unsigned size;
         if (pattern) {
-            size = sizeof(uint64_t);
+            size = pat_bytes[cnt];
         } else {
             size = std::min((addr | (burst_size - 1)) + 1,
                             base_addr + pkt->getSize()) - addr;
@@ -319,7 +335,11 @@ MemCtrl::addToReadQueue(PacketPtr pkt, unsigned int pkt_count, bool is_dram)
         }
 
         if (pattern) {
-            std::advance(lut_index, 1);
+            Addr burst_idx = lut_index->first / burst_size;
+            while (lut_index != lut_end &&
+                  lut_index->first / burst_size == burst_idx) {
+                std::advance(lut_index, 1);
+            }
             addr = (lut_index != lut_end ? lut_index->first : 0);
             assert(addr || (cnt == pkt_count - 1));
         } else {
@@ -358,9 +378,13 @@ MemCtrl::addToWriteQueue(PacketPtr pkt, unsigned int pkt_count, bool is_dram)
     const Addr base_addr = pkt->getAddr();
     Addr addr = base_addr;
 
+    uint32_t burst_size = is_dram ? dram->bytesPerBurst() :
+                                    nvm->bytesPerBurst();
+
     // Check if it is a pattern request from SGA-DMA
     bool pattern = false;
     cat::amap_it_t lut_index, lut_end;
+    std::vector<uint16_t> pat_bytes;
     if (pkt->req->taskId() == context_switch_task_id::DMA &&
         pkt->req->substreamId() == 742) {
         pattern = true;
@@ -371,20 +395,32 @@ MemCtrl::addToWriteQueue(PacketPtr pkt, unsigned int pkt_count, bool is_dram)
 
         // Get the LUT address index
         // (note: assume that DMA request are already word-aligned)
+        uint16_t length = pkt->getSize() / sizeof(uint64_t);
         lut_index = state->lut.find(base_addr);
-        lut_end   = state->lut.end();
+        lut_end   = std::next(lut_index, length);
         assert(lut_index != lut_end);
 
         // Split packet in multiple sub-packets, overwriting pkt_count
-        pkt_count = pkt->getSize() / sizeof(uint64_t);
+        unsigned int sga_dma_pkt_count = 1;
+        unsigned int count_items = 0;
+        Addr burst_idx = lut_index->first / burst_size;
+        for (auto i = lut_index; i != lut_end; i++) {
+            if ((i->first / burst_size) != burst_idx) {
+                burst_idx = i->first / burst_size;
+                sga_dma_pkt_count++;
+                pat_bytes.emplace_back(count_items * sizeof(uint64_t));
+                count_items = 0;
+            }
+            count_items++;
+        }
+        pat_bytes.emplace_back(count_items * sizeof(uint64_t));
+        pkt_count = sga_dma_pkt_count;
     }
 
-    uint32_t burst_size = is_dram ? dram->bytesPerBurst() :
-                                    nvm->bytesPerBurst();
     for (int cnt = 0; cnt < pkt_count; ++cnt) {
         unsigned size;
         if (pattern) {
-            size = sizeof(uint64_t);
+            size = pat_bytes[cnt];
         } else {
             size = std::min((addr | (burst_size - 1)) + 1,
                             base_addr + pkt->getSize()) - addr;
@@ -436,7 +472,11 @@ MemCtrl::addToWriteQueue(PacketPtr pkt, unsigned int pkt_count, bool is_dram)
         }
 
         if (pattern) {
-            std::advance(lut_index, 1);
+            Addr burst_idx = lut_index->first / burst_size;
+            while (lut_index != lut_end &&
+                  lut_index->first / burst_size == burst_idx) {
+                std::advance(lut_index, 1);
+            }
             addr = (lut_index != lut_end ? lut_index->first : 0);
             assert(addr || (cnt == pkt_count - 1));
         } else {
