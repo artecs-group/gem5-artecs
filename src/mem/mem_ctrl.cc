@@ -435,8 +435,14 @@ MemCtrl::addToWriteQueue(PacketPtr pkt, unsigned int pkt_count, bool is_dram)
             stats.mergedWrBursts++;
         }
 
-        // Starting address of next memory pkt (aligned to burst_size boundary)
-        addr = (addr | (burst_size - 1)) + 1;
+        if (pattern) {
+            std::advance(lut_index, 1);
+            addr = (lut_index != lut_end ? lut_index->first : 0);
+            assert(addr || (cnt == pkt_count - 1));
+        } else {
+            // Starting address of next memory pkt (aligned to burst boundary)
+            addr = (addr | (burst_size - 1)) + 1;
+        }
     }
 
     // we do not wait for the writes to be send to the actual memory,
