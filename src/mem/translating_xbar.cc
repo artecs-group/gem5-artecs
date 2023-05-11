@@ -257,7 +257,8 @@ TranslatingXBar::recvTimingReq(PacketPtr pkt, PortID cpu_side_port_id)
 
         // check if any dma transfer is in progress for the required address
         // - query
-        q_pkt = createPacket(MemCmd::WriteReq, dmac_base_addr, pkt_addr);
+        Addr pkt_addr_sz = pkt_addr + (pkt->getSize() << 53);
+        q_pkt = createPacket(MemCmd::WriteReq, dmac_base_addr, pkt_addr_sz);
         memSidePorts[dmacPortID]->sendFunctional(q_pkt);
         delete q_pkt;
         // - response

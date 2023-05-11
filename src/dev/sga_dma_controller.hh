@@ -124,6 +124,9 @@ class SgaDmaController : public SgaDmaDevice
     /* Completion flags vector */
     std::vector<bool> compFlags;
 
+    /* Pending operations */
+    std::deque<std::pair<amap_t, bool>> pending_ops;
+
     /* Event triggered at the end of a DMA chunk transfer */
     EventFunctionWrapper *eocEvent;
 

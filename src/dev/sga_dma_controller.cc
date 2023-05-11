@@ -101,29 +101,57 @@ SgaDmaController::setStatus(bool running)
 }
 
 void
-SgaDmaController::checkBusy(Addr addr)
+SgaDmaController::checkBusy(Addr addr_sz)
 {
     // Note 1: Assume the access being checked is a not a strided one.
     // Note 2: The completion flags are set per chunk, which typically
     //         has a size equal or larger than the cache line.
-    uint16_t index;
-    Addr lk_addr = 0;
+    uint8_t size = (addr_sz >> 53) & 0xff;
+    Addr addr = addr_sz & 0xffffffffffff;
+    bool busy = false;
 
-    if (scattering) {
-        auto it = lut.lower_bound(lkAlign(addr));
-        index = std::distance(lut.begin(), it);
-        if (index < lut.size()) {
-            lk_addr = it->first;
-        }
-    } else {
-        auto it = lut.to.lower_bound(lkAlign(addr));
-        index = std::distance(lut.to.begin(), it);
-        if (index < lut.size()) {
-            lk_addr = it->second;
+    // Check pending tranfers first
+    for (auto op : pending_ops) {
+        amap_t &op_lut = op.first;
+        bool op_scat = op.second;
+        if (op_scat) {
+            auto it = op_lut.lower_bound(lkAlign(addr));
+            if ((it != op_lut.end()) && (it->first - addr < size)) {
+                busy = true;
+                break;
+            }
+        } else {
+            auto it = op_lut.to.lower_bound(lkAlign(addr));
+            if ((it != op_lut.to.end()) && (it->second - addr < size)) {
+                busy = true;
+                break;
+            }
         }
     }
 
-    if (lk_addr && (lk_addr - addr < 64) && !compFlags[index]) {
+    // Check current transfer
+    if (!busy) {
+        uint16_t index;
+        Addr lk_addr = 0;
+        if (scattering) {
+            auto it = lut.lower_bound(lkAlign(addr));
+            index = std::distance(lut.begin(), it);
+            if (index < lut.size()) {
+                lk_addr = it->first;
+            }
+        } else {
+            auto it = lut.to.lower_bound(lkAlign(addr));
+            index = std::distance(lut.to.begin(), it);
+            if (index < lut.size()) {
+                lk_addr = it->second;
+            }
+        }
+        if (lk_addr && (lk_addr - addr < size) && !compFlags[index]) {
+            busy = true;
+        }
+    }
+
+    if (busy) {
         DPRINTF(SgaDma, "Address is BUSY\n");
         conflict = true;
         setBusyResponse(true);
@@ -208,13 +236,13 @@ SgaDmaController::regWrite(Addr addr, uint64_t data)
         DPRINTF(SgaDma, "Received command CAT_START_STOP\n");
         switch(decodeStartStop(payload)) {
           case CAT_SUB_START:
-            DPRINTF(SgaDma, "Command is START, beginning transfer\n");
+            DPRINTF(SgaDma, "Command is START\n");
             startTransfer(decodeDir(payload));
             setCmdResponse(true);
             break;
 
           case CAT_SUB_STOP:
-            DPRINTF(SgaDma, "Command is STOP, interrupting transfer\n");
+            DPRINTF(SgaDma, "Command is STOP, interrupting transfers\n");
             stopTransfer();
             setCmdResponse(true);
             break;
@@ -237,6 +265,7 @@ bool
 SgaDmaController::startTransfer(bool _scattering)
 {
     if (!running) {
+        DPRINTF(SgaDma, "Queue is free, starting a new transfer\n");
         generateLut(currentParams, lut);
         // (re-)initialize completion flags vector
         compFlags.clear();
@@ -246,9 +275,13 @@ SgaDmaController::startTransfer(bool _scattering)
         dmaFifo->startFill(lut, _scattering, compFlags);
         setStatus(true);
         running = true;
-        return true;
+    } else {
+        DPRINTF(SgaDma, "Another transfer is ongoing, enqueuing\n");
+        amap_t q_lut;
+        generateLut(currentParams, q_lut);
+        pending_ops.push_back(std::make_pair(q_lut, _scattering));
     }
-    return false;
+    return true;
 }
 
 bool
@@ -256,6 +289,7 @@ SgaDmaController::stopTransfer()
 {
     if (running) {
         dmaFifo->stopFill();
+        pending_ops = {};
         running = false;
         return true;
     }
@@ -282,9 +316,22 @@ SgaDmaController::eotCallback()
 {
     DPRINTF(SgaDma, "The DMA transfer has been %s\n",
             running ? "completed" : "canceled");
-    setStatus(false);
     lut.clear();
-    running = false;
+    if (!pending_ops.empty()) {
+        std::pair<amap_t, bool> op = pending_ops.front();
+        DPRINTF(SgaDma, "Process next pending request\n");
+        lut = amap_t(op.first);
+        // (re-)initialize completion flags vector
+        compFlags.clear();
+        compFlags.resize(lut.size(), false);
+        // start the dma transfer based on the lut and direction
+        scattering = op.second;
+        dmaFifo->startFill(lut, op.second, compFlags);
+        pending_ops.pop_front();
+    } else {
+        setStatus(false);
+        running = false;
+    }
 }
 
 Tick
