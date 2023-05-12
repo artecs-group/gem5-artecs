@@ -177,7 +177,8 @@ SgaDmaReqState::setCompFlags(Addr start_addr, uint16_t length)
     if (scattering) {
         index = std::distance(lut.begin(), lut.find(start_addr));
     } else {
-        index = std::distance(lut.to.begin(), lut.to.find(start_addr));
+        index = std::distance(lut.begin(),
+            lut.find(lut.to.find(start_addr)->second));
     }
 
     assert(index + length <= compFlags.size());

@@ -122,7 +122,7 @@ SgaDmaController::checkBusy(Addr addr_sz)
             }
         } else {
             auto it = op_lut.to.lower_bound(lkAlign(addr));
-            if ((it != op_lut.to.end()) && (it->second - addr < size)) {
+            if ((it != op_lut.to.end()) && (it->first - addr < size)) {
                 busy = true;
                 break;
             }
@@ -141,9 +141,9 @@ SgaDmaController::checkBusy(Addr addr_sz)
             }
         } else {
             auto it = lut.to.lower_bound(lkAlign(addr));
-            index = std::distance(lut.to.begin(), it);
+            index = std::distance(lut.begin(), lut.find(it->second));
             if (index < lut.size()) {
-                lk_addr = it->second;
+                lk_addr = it->first;
             }
         }
         if (lk_addr && (lk_addr - addr < size) && !compFlags[index]) {
