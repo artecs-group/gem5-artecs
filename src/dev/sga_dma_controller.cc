@@ -233,7 +233,7 @@ SgaDmaController::regWrite(Addr addr, uint64_t data)
         break;
 
       case CAT_START_STOP:
-        DPRINTF(SgaDma, "Received command CAT_START_STOP\n");
+        DPRINTF(SgaDma, "Received command SGA_DMA_START_STOP\n");
         switch(decodeStartStop(payload)) {
           case CAT_SUB_START:
             DPRINTF(SgaDma, "Command is START\n");
