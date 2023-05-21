@@ -89,21 +89,21 @@ bool setParams(uint64_t req, params_t &p, std::string &cmd_name) {
         break;
 
       case CAT_SET_INTLV_D2:
-        p.iv2_stride = (payload >> 16) & 0xffff;
-        p.iv2_offset = payload & 0xffff;
+        p.iv2_stride = (payload >> 32) & 0xffff;
+        p.iv2_offset = payload & 0xffffffff;
         cmd_name     = "SET_INTLV_D2";
         success      = true;
         break;
 
       case CAT_SET_INTLV_D3:
-        p.iv3_stride = (payload >> 16) & 0xffff;
-        p.iv3_offset = payload & 0xffff;
+        p.iv3_stride = (payload >> 32) & 0xffff;
+        p.iv3_offset = payload & 0xffffffff;
         cmd_name     = "SET_INTLV_D3";
         success      = true;
         break;
 
       case CAT_SET_OLOOP:
-        p.ol_offset  = (payload >> 16) & 0xffff;
+        p.ol_offset  = (payload >> 16) & 0xffffffff;
         p.ol_length  = payload & 0xffff;
         cmd_name     = "SET_OLOOP";
         success      = true;
