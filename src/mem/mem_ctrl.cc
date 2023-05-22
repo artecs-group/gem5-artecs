@@ -46,7 +46,6 @@
 #include "debug/MemCtrl.hh"
 #include "debug/NVM.hh"
 #include "debug/QOS.hh"
-#include "dev/cat_common.hh"
 #include "dev/sga_dma_device.hh"
 #include "mem/mem_interface.hh"
 #include "sim/system.hh"
@@ -196,7 +195,8 @@ MemCtrl::writeQueueFull(unsigned int neededEntries) const
 }
 
 void
-MemCtrl::addToReadQueue(PacketPtr pkt, unsigned int pkt_count, bool is_dram)
+MemCtrl::addToReadQueue(PacketPtr pkt, unsigned int pkt_count, bool is_dram,
+                        PatternInfo *pattern)
 {
     // only add to the read queue here. whenever the request is
     // eventually done, set the readyTime, and call schedule()
@@ -218,46 +218,16 @@ MemCtrl::addToReadQueue(PacketPtr pkt, unsigned int pkt_count, bool is_dram)
     uint32_t burst_size = is_dram ? dram->bytesPerBurst() :
                                     nvm->bytesPerBurst();
 
-    // Check if it is a pattern request from SGA-DMA
-    bool pattern = false;
     cat::amap_it_t lut_index, lut_end;
-    std::vector<uint16_t> pat_bytes;
-    if (pkt->req->taskId() == context_switch_task_id::DMA &&
-        pkt->req->substreamId() == 742) {
-        pattern = true;
-
-        // Access the packet sender state (containing a LUT reference)
-        auto *state = pkt->findNextSenderState<cat::SgaDmaReqState>();
-        assert(state);
-
-        // Get the LUT address index
-        // (note: assume that DMA request are already word-aligned)
-        uint16_t length = pkt->getSize() / sizeof(uint64_t);
-        lut_index = state->lut.find(base_addr);
-        lut_end   = std::next(lut_index, length);
-        assert(lut_index != lut_end);
-
-        // Split packet in multiple sub-packets, overwriting pkt_count
-        unsigned int sga_dma_pkt_count = 1;
-        unsigned int count_items = 0;
-        Addr burst_idx = lut_index->first / burst_size;
-        for (auto i = lut_index; i != lut_end; i++) {
-            if ((i->first / burst_size) != burst_idx) {
-                burst_idx = i->first / burst_size;
-                sga_dma_pkt_count++;
-                pat_bytes.emplace_back(count_items * sizeof(uint64_t));
-                count_items = 0;
-            }
-            count_items++;
-        }
-        pat_bytes.emplace_back(count_items * sizeof(uint64_t));
-        pkt_count = sga_dma_pkt_count;
+    if (pattern) {
+        lut_index = pattern->lut_index;
+        lut_end   = pattern->lut_end;
     }
 
     for (int cnt = 0; cnt < pkt_count; ++cnt) {
         unsigned size;
         if (pattern) {
-            size = pat_bytes[cnt];
+            size = pattern->pat_bytes[cnt];
         } else {
             size = std::min((addr | (burst_size - 1)) + 1,
                             base_addr + pkt->getSize()) - addr;
@@ -337,7 +307,7 @@ MemCtrl::addToReadQueue(PacketPtr pkt, unsigned int pkt_count, bool is_dram)
         if (pattern) {
             Addr burst_idx = lut_index->first / burst_size;
             while (lut_index != lut_end &&
-                  lut_index->first / burst_size == burst_idx) {
+                   lut_index->first / burst_size == burst_idx) {
                 std::advance(lut_index, 1);
             }
             addr = (lut_index != lut_end ? lut_index->first : 0);
@@ -367,7 +337,8 @@ MemCtrl::addToReadQueue(PacketPtr pkt, unsigned int pkt_count, bool is_dram)
 }
 
 void
-MemCtrl::addToWriteQueue(PacketPtr pkt, unsigned int pkt_count, bool is_dram)
+MemCtrl::addToWriteQueue(PacketPtr pkt, unsigned int pkt_count, bool is_dram,
+                         PatternInfo *pattern)
 {
     // only add to the write queue here. whenever the request is
     // eventually done, set the readyTime, and call schedule()
@@ -381,46 +352,16 @@ MemCtrl::addToWriteQueue(PacketPtr pkt, unsigned int pkt_count, bool is_dram)
     uint32_t burst_size = is_dram ? dram->bytesPerBurst() :
                                     nvm->bytesPerBurst();
 
-    // Check if it is a pattern request from SGA-DMA
-    bool pattern = false;
     cat::amap_it_t lut_index, lut_end;
-    std::vector<uint16_t> pat_bytes;
-    if (pkt->req->taskId() == context_switch_task_id::DMA &&
-        pkt->req->substreamId() == 742) {
-        pattern = true;
-
-        // Access the packet sender state (containing a LUT reference)
-        auto *state = pkt->findNextSenderState<cat::SgaDmaReqState>();
-        assert(state);
-
-        // Get the LUT address index
-        // (note: assume that DMA request are already word-aligned)
-        uint16_t length = pkt->getSize() / sizeof(uint64_t);
-        lut_index = state->lut.find(base_addr);
-        lut_end   = std::next(lut_index, length);
-        assert(lut_index != lut_end);
-
-        // Split packet in multiple sub-packets, overwriting pkt_count
-        unsigned int sga_dma_pkt_count = 1;
-        unsigned int count_items = 0;
-        Addr burst_idx = lut_index->first / burst_size;
-        for (auto i = lut_index; i != lut_end; i++) {
-            if ((i->first / burst_size) != burst_idx) {
-                burst_idx = i->first / burst_size;
-                sga_dma_pkt_count++;
-                pat_bytes.emplace_back(count_items * sizeof(uint64_t));
-                count_items = 0;
-            }
-            count_items++;
-        }
-        pat_bytes.emplace_back(count_items * sizeof(uint64_t));
-        pkt_count = sga_dma_pkt_count;
+    if (pattern) {
+        lut_index = pattern->lut_index;
+        lut_end   = pattern->lut_end;
     }
 
     for (int cnt = 0; cnt < pkt_count; ++cnt) {
         unsigned size;
         if (pattern) {
-            size = pat_bytes[cnt];
+            size = pattern->pat_bytes[cnt];
         } else {
             size = std::min((addr | (burst_size - 1)) + 1,
                             base_addr + pkt->getSize()) - addr;
@@ -474,7 +415,7 @@ MemCtrl::addToWriteQueue(PacketPtr pkt, unsigned int pkt_count, bool is_dram)
         if (pattern) {
             Addr burst_idx = lut_index->first / burst_size;
             while (lut_index != lut_end &&
-                  lut_index->first / burst_size == burst_idx) {
+                   lut_index->first / burst_size == burst_idx) {
                 std::advance(lut_index, 1);
             }
             addr = (lut_index != lut_end ? lut_index->first : 0);
@@ -567,10 +508,39 @@ MemCtrl::recvTimingReq(PacketPtr pkt)
     unsigned int pkt_count = divCeil(offset + size, burst_size);
 
     // Check if it is a pattern request from SGA-DMA
-    bool pattern = false;
+    PatternInfo *pattern = nullptr;
     if (pkt->req->taskId() == context_switch_task_id::DMA &&
         pkt->req->substreamId() == 742) {
-        pattern = true;
+        cat::amap_it_t lut_index, lut_end;
+        std::vector<uint16_t> pat_bytes;
+
+        // Access the packet sender state (containing a LUT reference)
+        auto *state = pkt->findNextSenderState<cat::SgaDmaReqState>();
+        assert(state);
+
+        // Get the LUT address index
+        // (note: assume that DMA request are already word-aligned)
+        uint16_t length = pkt->getSize() / sizeof(uint64_t);
+        lut_index = state->lut.find(pkt->getAddr());
+        lut_end   = std::next(lut_index, length);
+        assert(lut_index != lut_end);
+
+        // Split packet in multiple sub-packets, overwriting pkt_count
+        unsigned int sga_dma_pkt_count = 1;
+        unsigned int count_items = 0;
+        Addr burst_idx = lut_index->first / burst_size;
+        for (auto i = lut_index; i != lut_end; i++) {
+            if ((i->first / burst_size) != burst_idx) {
+                burst_idx = i->first / burst_size;
+                sga_dma_pkt_count++;
+                pat_bytes.emplace_back(count_items * sizeof(uint64_t));
+                count_items = 0;
+            }
+            count_items++;
+        }
+        pat_bytes.emplace_back(count_items * sizeof(uint64_t));
+        pkt_count = sga_dma_pkt_count;
+        pattern = new PatternInfo(lut_index, lut_end, pat_bytes);
     }
 
     // run the QoS scheduler and assign a QoS priority value to the packet
@@ -586,7 +556,7 @@ MemCtrl::recvTimingReq(PacketPtr pkt)
             stats.numWrRetry++;
             return false;
         } else {
-            addToWriteQueue(pkt, pkt_count, is_dram);
+            addToWriteQueue(pkt, pkt_count, is_dram, pattern);
             pattern ? stats.patWriteReqs++ : stats.writeReqs++;
             stats.bytesWrittenSys += size;
         }
@@ -600,12 +570,15 @@ MemCtrl::recvTimingReq(PacketPtr pkt)
             stats.numRdRetry++;
             return false;
         } else {
-            addToReadQueue(pkt, pkt_count, is_dram);
+            addToReadQueue(pkt, pkt_count, is_dram, pattern);
             pattern ? stats.patReadReqs++ : stats.readReqs++;
             stats.bytesReadSys += size;
         }
     }
 
+    if (pattern) {
+        delete pattern;
+    }
     return true;
 }
 

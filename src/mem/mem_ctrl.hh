@@ -54,6 +54,7 @@
 
 #include "base/callback.hh"
 #include "base/statistics.hh"
+#include "dev/cat_common.hh"
 #include "enums/MemSched.hh"
 #include "mem/qos/mem_ctrl.hh"
 #include "mem/qport.hh"
@@ -68,6 +69,23 @@ namespace memory
 
 class DRAMInterface;
 class NVMInterface;
+
+/**
+ * Pattern information (from SGA-DMA)
+ */
+class PatternInfo
+{
+  public:
+
+    cat::amap_it_t lut_index;
+    cat::amap_it_t lut_end;
+    std::vector<uint16_t> pat_bytes;
+
+    PatternInfo(cat::amap_it_t _lut_index, cat::amap_it_t _lut_end,
+                std::vector<uint16_t> _pat_bytes)
+        : lut_index(_lut_index), lut_end(_lut_end), pat_bytes(_pat_bytes)
+    { }
+};
 
 /**
  * A burst helper helps organize and manage a packet that is larger than
@@ -329,7 +347,8 @@ class MemCtrl : public qos::MemCtrl
      * translate to. If pkt size is larger then one full burst,
      * then pkt_count is greater than one.
      */
-    void addToReadQueue(PacketPtr pkt, unsigned int pkt_count, bool is_dram);
+    void addToReadQueue(PacketPtr pkt, unsigned int pkt_count, bool is_dram,
+                        PatternInfo *pattern = nullptr);
 
     /**
      * Decode the incoming pkt, create a mem_pkt and push to the
@@ -343,7 +362,8 @@ class MemCtrl : public qos::MemCtrl
      * translate to. If pkt size is larger then one full burst,
      * then pkt_count is greater than one.
      */
-    void addToWriteQueue(PacketPtr pkt, unsigned int pkt_count, bool is_dram);
+    void addToWriteQueue(PacketPtr pkt, unsigned int pkt_count, bool is_dram,
+                         PatternInfo *pattern = nullptr);
 
     /**
      * Actually do the burst based on media specific access function.
