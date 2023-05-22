@@ -98,7 +98,7 @@ SgaDmaPort::handleResp(SgaDmaReqState *state, Addr addr, Addr size, Tick delay,
             dst_addr = state->lut[pkt->getAddr()];
         }
         RequestPtr dst_req = std::make_shared<Request>(
-            dst_addr, size, 0, state->id);
+            dst_addr, size, Request::UNCACHEABLE, state->id);
         dst_req->setStreamId(state->sid);
         dst_req->setSubstreamId(state->ssid);
         dst_req->taskId(context_switch_task_id::DMA);
