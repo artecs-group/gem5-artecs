@@ -244,7 +244,7 @@ TranslatingXBar::recvTimingReq(PacketPtr pkt, PortID cpu_side_port_id)
           case 0b1010:
             DPRINTF(TranslatingXBar, "Address %#x belongs to a mapped range "
                     "but is not translatable\n", pkt_addr);
-            // to-do: uncached access
+            pkt->req->setFlags(Request::UNCACHEABLE);
             break;
           case 0b0000:
             DPRINTF(TranslatingXBar, "Address %#x does not belong to any "
