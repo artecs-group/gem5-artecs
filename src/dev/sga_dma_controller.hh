@@ -115,9 +115,6 @@ class SgaDmaController : public SgaDmaDevice
     /* Current parameters */
     params_t currentParams;
 
-    /* Flag set when some data have been requested during transfer */
-    bool conflict;
-
     /* Address LUT */
     amap_t lut;
 

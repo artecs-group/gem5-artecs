@@ -19,8 +19,7 @@ SgaDmaController::SgaDmaController(const Params &params) :
     responseReg(0),
     statusReg(0),
     running(false),
-    scattering(false),
-    conflict(false)
+    scattering(false)
 {
     eocEvent = new EventFunctionWrapper([this]{ eocCallback(); }, name());
     eotEvent = new EventFunctionWrapper([this]{ eotCallback(); }, name());
@@ -153,7 +152,6 @@ SgaDmaController::checkBusy(Addr addr_sz)
 
     if (busy) {
         DPRINTF(SgaDma, "Address is BUSY\n");
-        conflict = true;
         setBusyResponse(true);
         return;
     }
@@ -299,16 +297,14 @@ SgaDmaController::stopTransfer()
 void
 SgaDmaController::eocCallback()
 {
-    if (conflict) {
-        // Send a custom "retry packet" through dmaPort
-        RequestPtr req = std::make_shared<Request>(0x8000000000000000,
-            sizeof(uint64_t), 0, Request::funcRequestorId);
-        PacketPtr pkt = new Packet(req, MemCmd::WriteReq);
-        DPRINTF(SgaDma, "DMA chunk complete, signaling TranslatingXBar\n");
-        dmaPort.sendFunctional(pkt);
-        delete pkt;
-    }
-    conflict = false;
+    DPRINTF(SgaDma, "DMA chunk complete\n");
+    // Send a custom "retry packet" through dmaPort
+    RequestPtr req = std::make_shared<Request>(0x8000000000000000,
+        sizeof(uint64_t), 0, Request::funcRequestorId);
+    PacketPtr pkt = new Packet(req, MemCmd::WriteReq);
+    DPRINTF(SgaDma, "Sending retry signal to TranslatingXBar\n");
+    dmaPort.sendFunctional(pkt);
+    delete pkt;
 }
 
 void
