@@ -271,7 +271,7 @@ TranslatingXBar::recvTimingReq(PacketPtr pkt, PortID cpu_side_port_id)
         if (((q_busy >> 4) & 0xf) == 0xf) {
             DPRINTF(TranslatingXBar, "Address %#x is currently involved in a "
                     "DMA transfer, postponing request\n", pkt_addr);
-            busyList.emplace_back(pkt);
+            busyList.emplace_back(std::make_pair(pkt, cpu_side_port_id));
             return true;
         }
     }
@@ -467,12 +467,12 @@ TranslatingXBar::recvFunctional(PacketPtr pkt, PortID cpu_side_port_id)
     if (high_bits && pkt->isWrite()) {
         if (high_bits == 0b100) {
             DPRINTF(TranslatingXBar, "Found DMAC chunk completion signal\n");
-            PacketList pendingRetry(busyList);
+            PktOriginList pendingRetry(busyList);
             busyList.clear();
-            for (PacketPtr const& p : pendingRetry) {
+            for (auto const& p : pendingRetry) {
                 DPRINTF(TranslatingXBar, "Retrying request targeting address "
-                    "%#x, blocked by DMA transfer\n", p->getAddr());
-                recvTimingReq(p, cpu_side_port_id);
+                    "%#x, blocked by DMA transfer\n", p.first->getAddr());
+                recvTimingReq(p.first, p.second);
             }
             return;
         }

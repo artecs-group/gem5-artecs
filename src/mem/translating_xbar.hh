@@ -84,7 +84,8 @@ class TranslatingXBar : public BaseXBar
     /**
      * List of packets that have to be released after DMA transfer completion
      */
-    PacketList busyList;
+    typedef std::vector<std::pair<PacketPtr, PortID>> PktOriginList;
+    PktOriginList busyList;
 
     /**
      * Declaration of the translating crossbar CPU-side port type, one
