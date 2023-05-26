@@ -408,7 +408,7 @@ TranslatingXBar::recvReqRetry(PortID mem_side_port_id)
     // responses never block on forwarding them, so the retry will
     // always be coming from a port to which we tried to forward a
     // request
-    reqLayers[mem_side_port_id]->recvRetry();
+    reqLayers[mem_side_port_id]->recvRetry(true);
 }
 
 Tick

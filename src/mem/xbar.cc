@@ -273,7 +273,7 @@ BaseXBar::Layer<SrcType, DstType>::releaseLayer()
 
 template <typename SrcType, typename DstType>
 void
-BaseXBar::Layer<SrcType, DstType>::retryWaiting()
+BaseXBar::Layer<SrcType, DstType>::retryWaiting(bool no_occupy)
 {
     // this should never be called with no one waiting
     assert(!waitingForLayer.empty());
@@ -302,13 +302,13 @@ BaseXBar::Layer<SrcType, DstType>::retryWaiting()
         state = BUSY;
 
         // occupy the crossbar layer until the next clock edge
-        occupyLayer(xbar.clockEdge());
+        no_occupy ? occupyLayer(0) : occupyLayer(xbar.clockEdge());
     }
 }
 
 template <typename SrcType, typename DstType>
 void
-BaseXBar::Layer<SrcType, DstType>::recvRetry()
+BaseXBar::Layer<SrcType, DstType>::recvRetry(bool no_occupy)
 {
     // we should never get a retry without having failed to forward
     // something to this port
@@ -325,7 +325,7 @@ BaseXBar::Layer<SrcType, DstType>::recvRetry()
     // if the layer is idle, retry this port straight away, if we
     // are busy, then simply let the port wait for its turn
     if (state == IDLE) {
-        retryWaiting();
+        retryWaiting(no_occupy);
     } else {
         assert(state == BUSY);
     }

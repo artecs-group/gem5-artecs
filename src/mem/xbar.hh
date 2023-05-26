@@ -155,14 +155,14 @@ class BaseXBar : public ClockedObject
          * Send a retry to the port at the head of waitingForLayer. The
          * caller must ensure that the list is not empty.
          */
-        void retryWaiting();
+        void retryWaiting(bool no_occupy = false);
 
         /**
          * Handle a retry from a neighbouring module. This wraps
          * retryWaiting by verifying that there are ports waiting
          * before calling retryWaiting.
          */
-        void recvRetry();
+        void recvRetry(bool no_occupy = false);
 
       protected:
 
