@@ -221,7 +221,7 @@ class BaseXBar : public ClockedObject
          * idle state where we proceed to send a retry to any
          * potential waiting port, or drain if asked to do so.
          */
-        void releaseLayer();
+        void releaseLayer(bool no_occupy = false);
         EventFunctionWrapper releaseEvent;
 
         /**

@@ -169,7 +169,7 @@ void BaseXBar::Layer<SrcType, DstType>::occupyLayer(Tick until)
 
     if (!until) {
         // release the layer immediately (used in translating_xbar)
-        releaseLayer();
+        releaseLayer(true);
         return;
     }
 
@@ -249,7 +249,7 @@ BaseXBar::Layer<SrcType, DstType>::failedTiming(SrcType* src_port,
 
 template <typename SrcType, typename DstType>
 void
-BaseXBar::Layer<SrcType, DstType>::releaseLayer()
+BaseXBar::Layer<SrcType, DstType>::releaseLayer(bool no_occupy)
 {
     // releasing the bus means we should now be idle
     assert(state == BUSY);
@@ -263,7 +263,7 @@ BaseXBar::Layer<SrcType, DstType>::releaseLayer()
         // there is no point in sending a retry if someone is still
         // waiting for the peer
         if (waitingForPeer == NULL)
-            retryWaiting();
+            retryWaiting(no_occupy);
     } else if (waitingForPeer == NULL && drainState() == DrainState::Draining) {
         DPRINTF(Drain, "Crossbar done draining, signaling drain manager\n");
         //If we weren't able to drain before, do it now.
