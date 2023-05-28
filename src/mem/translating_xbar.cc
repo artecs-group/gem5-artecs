@@ -405,10 +405,24 @@ TranslatingXBar::recvTimingResp(PacketPtr pkt, PortID mem_side_port_id)
 void
 TranslatingXBar::recvReqRetry(PortID mem_side_port_id)
 {
+    if (!pendingRetry.empty()) {
+        PortID id = reqLayers[mem_side_port_id]->getWaitingForPeer()->getId();
+        for (auto it = pendingRetry.begin(); it != pendingRetry.end(); it++) {
+            if (it->second == id) {
+                DPRINTF(TranslatingXBar, "Retrying packet from retry list\n");
+                reqLayers[mem_side_port_id]->recvRetry(true, true);
+                if (recvTimingReq(it->first, it->second)) {
+                    pendingRetry.erase(it);
+                }
+                return;
+            }
+        }
+    }
+
     // responses never block on forwarding them, so the retry will
     // always be coming from a port to which we tried to forward a
     // request
-    reqLayers[mem_side_port_id]->recvRetry(true);
+    reqLayers[mem_side_port_id]->recvRetry(true, false);
 }
 
 Tick
@@ -467,12 +481,16 @@ TranslatingXBar::recvFunctional(PacketPtr pkt, PortID cpu_side_port_id)
     if (high_bits && pkt->isWrite()) {
         if (high_bits == 0b100) {
             DPRINTF(TranslatingXBar, "Found DMAC chunk completion signal\n");
-            PktOriginList pendingRetry(busyList);
+            PktOriginList busyListCopy(busyList);
             busyList.clear();
-            for (auto const& p : pendingRetry) {
+            for (auto const& p : busyListCopy) {
                 DPRINTF(TranslatingXBar, "Retrying request targeting address "
                     "%#x, blocked by DMA transfer\n", p.first->getAddr());
-                recvTimingReq(p.first, p.second);
+                if (!recvTimingReq(p.first, p.second)) {
+                    DPRINTF(TranslatingXBar, "Resource available but send "
+                            "failed, adding to retry list\n");
+                    pendingRetry.emplace_back(p);
+                }
             }
             return;
         }

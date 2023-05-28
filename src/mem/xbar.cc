@@ -273,7 +273,7 @@ BaseXBar::Layer<SrcType, DstType>::releaseLayer(bool no_occupy)
 
 template <typename SrcType, typename DstType>
 void
-BaseXBar::Layer<SrcType, DstType>::retryWaiting(bool no_occupy)
+BaseXBar::Layer<SrcType, DstType>::retryWaiting(bool no_occupy, bool no_send)
 {
     // this should never be called with no one waiting
     assert(!waitingForLayer.empty());
@@ -289,9 +289,11 @@ BaseXBar::Layer<SrcType, DstType>::retryWaiting(bool no_occupy)
     SrcType* retryingPort = waitingForLayer.front();
     waitingForLayer.pop_front();
 
-    // tell the port to retry, which in some cases ends up calling the
-    // layer again
-    sendRetry(retryingPort);
+    if (!no_send) {
+        // tell the port to retry, which in some cases ends up calling the
+        // layer again
+        sendRetry(retryingPort);
+    }
 
     // If the layer is still in the retry state, sendTiming wasn't
     // called in zero time (e.g. the cache does this when a writeback
@@ -308,7 +310,7 @@ BaseXBar::Layer<SrcType, DstType>::retryWaiting(bool no_occupy)
 
 template <typename SrcType, typename DstType>
 void
-BaseXBar::Layer<SrcType, DstType>::recvRetry(bool no_occupy)
+BaseXBar::Layer<SrcType, DstType>::recvRetry(bool no_occupy, bool no_send)
 {
     // we should never get a retry without having failed to forward
     // something to this port
@@ -325,7 +327,7 @@ BaseXBar::Layer<SrcType, DstType>::recvRetry(bool no_occupy)
     // if the layer is idle, retry this port straight away, if we
     // are busy, then simply let the port wait for its turn
     if (state == IDLE) {
-        retryWaiting(no_occupy);
+        retryWaiting(no_occupy, no_send);
     } else {
         assert(state == BUSY);
     }

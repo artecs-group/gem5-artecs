@@ -86,6 +86,7 @@ class TranslatingXBar : public BaseXBar
      */
     typedef std::vector<std::pair<PacketPtr, PortID>> PktOriginList;
     PktOriginList busyList;
+    PktOriginList pendingRetry;
 
     /**
      * Declaration of the translating crossbar CPU-side port type, one
