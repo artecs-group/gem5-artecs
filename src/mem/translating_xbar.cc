@@ -483,13 +483,21 @@ TranslatingXBar::recvFunctional(PacketPtr pkt, PortID cpu_side_port_id)
             DPRINTF(TranslatingXBar, "Found DMAC chunk completion signal\n");
             PktOriginList busyListCopy(busyList);
             busyList.clear();
+            bool failed = false;
             for (auto const& p : busyListCopy) {
-                DPRINTF(TranslatingXBar, "Retrying request targeting address "
-                    "%#x, blocked by DMA transfer\n", p.first->getAddr());
-                if (!recvTimingReq(p.first, p.second)) {
-                    DPRINTF(TranslatingXBar, "Resource available but send "
-                            "failed, adding to retry list\n");
-                    pendingRetry.emplace_back(p);
+                if (!failed) {
+                    DPRINTF(TranslatingXBar, "Retrying request targeting "
+                            "address %#x, blocked by DMA transfer\n",
+                            p.first->getAddr());
+                    if (!recvTimingReq(p.first, p.second)) {
+                        DPRINTF(TranslatingXBar, "Resource available but send "
+                                "failed, adding to retry list\n");
+                        pendingRetry.emplace_back(p);
+                        failed = true;
+                    }
+                } else {
+                    // Re-add left elements to the busy list
+                    busyList.emplace_back(p);
                 }
             }
             return;
