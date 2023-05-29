@@ -160,6 +160,29 @@ TranslatingXBar::createPacket(MemCmd cmd, Addr addr, uint64_t data)
     return pkt;
 }
 
+void
+TranslatingXBar::processBusyList()
+{
+    PktOriginList busyListCopy(busyList);
+    busyList.clear();
+    for (auto const& p : busyListCopy) {
+        PortID mem_side_port_id = findPort(p.first->getAddrRange());
+        if (reqLayers[mem_side_port_id]->getWaitingForPeer() == NULL) {
+            DPRINTF(TranslatingXBar, "Retrying request targeting "
+                    "address %#x, blocked by DMA transfer\n",
+                    p.first->getAddr());
+            if (!recvTimingReq(p.first, p.second)) {
+                DPRINTF(TranslatingXBar, "Resource available but send "
+                        "failed, adding to retry list\n");
+                pendingRetry.emplace_back(p);
+            }
+        } else {
+            // Re-add unsent elements to the busy list
+            busyList.emplace_back(p);
+        }
+    }
+}
+
 bool
 TranslatingXBar::recvTimingReq(PacketPtr pkt, PortID cpu_side_port_id)
 {
@@ -412,9 +435,11 @@ TranslatingXBar::recvReqRetry(PortID mem_side_port_id)
                 if (recvTimingReq(it->first, it->second)) {
                     pendingRetry.erase(it);
                 }
-                return;
+                break;
             }
         }
+        processBusyList();
+        return;
     }
 
     // responses never block on forwarding them, so the retry will
@@ -478,24 +503,7 @@ TranslatingXBar::recvFunctional(PacketPtr pkt, PortID cpu_side_port_id)
     uint8_t high_bits = pkt->getAddr() >> 61;
     if (pkt->isWrite() && high_bits == 0b100) {
         DPRINTF(TranslatingXBar, "Found DMAC chunk completion signal\n");
-        PktOriginList busyListCopy(busyList);
-        busyList.clear();
-        for (auto const& p : busyListCopy) {
-            PortID mem_side_port_id = findPort(p.first->getAddrRange());
-            if (reqLayers[mem_side_port_id]->getWaitingForPeer() == NULL) {
-                DPRINTF(TranslatingXBar, "Retrying request targeting "
-                        "address %#x, blocked by DMA transfer\n",
-                        p.first->getAddr());
-                if (!recvTimingReq(p.first, p.second)) {
-                    DPRINTF(TranslatingXBar, "Resource available but send "
-                            "failed, adding to retry list\n");
-                    pendingRetry.emplace_back(p);
-                }
-            } else {
-                // Re-add unsent elements to the busy list
-                busyList.emplace_back(p);
-            }
-        }
+        processBusyList();
         return;
     }
 
