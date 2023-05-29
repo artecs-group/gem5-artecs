@@ -163,22 +163,24 @@ TranslatingXBar::createPacket(MemCmd cmd, Addr addr, uint64_t data)
 void
 TranslatingXBar::processBusyList()
 {
-    PktOriginList busyListCopy(busyList);
-    busyList.clear();
-    for (auto const& p : busyListCopy) {
-        PortID mem_side_port_id = findPort(p.first->getAddrRange());
-        if (reqLayers[mem_side_port_id]->getWaitingForPeer() == NULL) {
-            DPRINTF(TranslatingXBar, "Retrying request targeting "
-                    "address %#x, blocked by DMA transfer\n",
-                    p.first->getAddr());
-            if (!recvTimingReq(p.first, p.second)) {
-                DPRINTF(TranslatingXBar, "Resource available but send "
-                        "failed, adding to retry list\n");
-                pendingRetry.emplace_back(p);
+    if (!busyList.empty()) {
+        PktOriginList busyListCopy(busyList);
+        busyList.clear();
+        for (auto const& p : busyListCopy) {
+            PortID mem_side_port_id = findPort(p.first->getAddrRange());
+            if (reqLayers[mem_side_port_id]->getWaitingForPeer() == NULL) {
+                DPRINTF(TranslatingXBar, "Retrying request targeting "
+                        "address %#x, blocked by DMA transfer\n",
+                        p.first->getAddr());
+                if (!recvTimingReq(p.first, p.second)) {
+                    DPRINTF(TranslatingXBar, "Resource available but send "
+                            "failed, adding to retry list\n");
+                    pendingRetry.emplace_back(p);
+                }
+            } else {
+                // Re-add unsent elements to the busy list
+                busyList.emplace_back(p);
             }
-        } else {
-            // Re-add unsent elements to the busy list
-            busyList.emplace_back(p);
         }
     }
 }
