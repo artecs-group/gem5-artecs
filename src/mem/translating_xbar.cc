@@ -186,12 +186,10 @@ TranslatingXBar::recvTimingReq(PacketPtr pkt, PortID cpu_side_port_id)
         uint64_t data = pkt_addr & 0x1fffffffffffffff;
         if (high_bits == 0b001) {
             DPRINTF(TranslatingXBar, "Found translator programming command\n");
-            pkt->setAddr(at_base_addr);
-            pkt->set(data, ByteOrder::little);
+            pkt = createPacket(MemCmd::WriteReq, at_base_addr, data);
         } else if (high_bits == 0b010) {
             DPRINTF(TranslatingXBar, "Found DMAC programming command\n");
-            pkt->setAddr(dmac_base_addr);
-            pkt->set(data, ByteOrder::little);
+            pkt = createPacket(MemCmd::WriteReq, dmac_base_addr, data);
         }
     }
 
