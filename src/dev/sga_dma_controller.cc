@@ -227,6 +227,8 @@ SgaDmaController::regWrite(Addr addr, uint64_t data)
             DPRINTF(SgaDma, "No command received, checking if requested "
                     "address %#x is available\n", payload);
             checkBusy(data);
+        } else {
+            setBusyResponse(false);
         }
         break;
 
