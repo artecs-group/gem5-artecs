@@ -478,30 +478,27 @@ TranslatingXBar::recvFunctional(PacketPtr pkt, PortID cpu_side_port_id)
     }
 
     uint8_t high_bits = pkt->getAddr() >> 61;
-    if (high_bits && pkt->isWrite()) {
-        if (high_bits == 0b100) {
-            DPRINTF(TranslatingXBar, "Found DMAC chunk completion signal\n");
-            PktOriginList busyListCopy(busyList);
-            busyList.clear();
-            bool failed = false;
-            for (auto const& p : busyListCopy) {
-                if (!failed) {
-                    DPRINTF(TranslatingXBar, "Retrying request targeting "
-                            "address %#x, blocked by DMA transfer\n",
-                            p.first->getAddr());
-                    if (!recvTimingReq(p.first, p.second)) {
-                        DPRINTF(TranslatingXBar, "Resource available but send "
-                                "failed, adding to retry list\n");
-                        pendingRetry.emplace_back(p);
-                        failed = true;
-                    }
-                } else {
-                    // Re-add left elements to the busy list
-                    busyList.emplace_back(p);
+    if (pkt->isWrite() && high_bits == 0b100) {
+        DPRINTF(TranslatingXBar, "Found DMAC chunk completion signal\n");
+        PktOriginList busyListCopy(busyList);
+        busyList.clear();
+        for (auto const& p : busyListCopy) {
+            PortID mem_side_port_id = findPort(p.first->getAddrRange());
+            if (reqLayers[mem_side_port_id]->getWaitingForPeer() == NULL) {
+                DPRINTF(TranslatingXBar, "Retrying request targeting "
+                        "address %#x, blocked by DMA transfer\n",
+                        p.first->getAddr());
+                if (!recvTimingReq(p.first, p.second)) {
+                    DPRINTF(TranslatingXBar, "Resource available but send "
+                            "failed, adding to retry list\n");
+                    pendingRetry.emplace_back(p);
                 }
+            } else {
+                // Re-add unsent elements to the busy list
+                busyList.emplace_back(p);
             }
-            return;
         }
+        return;
     }
 
     // since our CPU-side ports are queued ports we need to check them as well
