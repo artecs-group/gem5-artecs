@@ -134,15 +134,19 @@ SgaDmaController::checkBusy(Addr addr_sz)
         Addr lk_addr = 0;
         if (scattering) {
             auto it = lut.lower_bound(lkAlign(addr));
-            index = std::distance(lut.begin(), it);
-            if (index < lut.size()) {
-                lk_addr = it->first;
+            if (it != lut.end()) {
+                index = std::distance(lut.begin(), it);
+                if (index < lut.size()) {
+                    lk_addr = it->first;
+                }
             }
         } else {
             auto it = lut.to.lower_bound(lkAlign(addr));
-            index = std::distance(lut.begin(), lut.find(it->second));
-            if (index < lut.size()) {
-                lk_addr = it->first;
+            if (it != lut.to.end()) {
+                index = std::distance(lut.begin(), lut.find(it->second));
+                if (index < lut.size()) {
+                    lk_addr = it->first;
+                }
             }
         }
         if (lk_addr && (lk_addr - addr < size) && !compFlags[index]) {
