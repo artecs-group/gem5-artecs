@@ -55,6 +55,8 @@
 #include "debug/Cache.hh"
 #include "debug/CacheTags.hh"
 #include "debug/CacheVerbose.hh"
+#include "dev/cat_common.hh"
+#include "dev/sga_dma_device.hh"
 #include "enums/Clusivity.hh"
 #include "mem/cache/cache_blk.hh"
 #include "mem/cache/mshr.hh"
@@ -171,15 +173,45 @@ Cache::access(PacketPtr pkt, CacheBlk *&blk, Cycles &lat,
 
         DPRINTF(Cache, "%s for %s\n", __func__, pkt->print());
 
-        // flush and invalidate any existing block
-        CacheBlk *old_blk(tags->findBlock(pkt->getAddr(), pkt->isSecure()));
-        if (old_blk && old_blk->isValid()) {
-            BaseCache::evictBlock(old_blk, writebacks);
-        }
+        // Check if it is a pattern request from SGA-DMA
+        if (pkt->req->taskId() == context_switch_task_id::DMA &&
+            pkt->req->substreamId() == 742) {
+            cat::amap_it_t lut_index, lut_end;
 
+            // Access the packet sender state (containing a LUT reference)
+            auto *state = pkt->findNextSenderState<cat::SgaDmaReqState>();
+            assert(state);
+
+            // Get the LUT address index
+            // (note: assume that DMA request are already word-aligned)
+            uint16_t length = pkt->getSize() / sizeof(uint64_t);
+            lut_index = state->lut.find(pkt->getAddr());
+            lut_end   = std::next(lut_index, length);
+            assert(lut_index != lut_end);
+
+            // Flush and invalidate any existing block
+            for (auto i = lut_index; i != lut_end; i++) {
+                CacheBlk *old_blk(tags->findBlock(i->first,
+                                                  pkt->isSecure()));
+                if (old_blk && old_blk->isValid()) {
+                    BaseCache::evictBlock(old_blk, writebacks);
+                }
+            }
+
+            // Apply zero latency, as these requests are not supposed to pass
+            // through the cache
+            lat = Cycles(0);
+        } else {
+            // flush and invalidate any existing block
+            CacheBlk *old_blk(tags->findBlock(pkt->getAddr(),
+                                              pkt->isSecure()));
+            if (old_blk && old_blk->isValid()) {
+                BaseCache::evictBlock(old_blk, writebacks);
+            }
+            // lookupLatency is the latency in case the request is uncacheable.
+            lat = lookupLatency;
+        }
         blk = nullptr;
-        // lookupLatency is the latency in case the request is uncacheable.
-        lat = lookupLatency;
         return false;
     }
 
