@@ -839,8 +839,15 @@ Cache::serviceMSHRTargets(MSHR *mshr, const PacketPtr pkt, CacheBlk *blk)
                 // not a cache fill, just forwarding response
                 // responseLatency is the latency of the return path
                 // from lower level cahces/memory to the core.
-                completion_time += clockEdge(responseLatency) +
-                    pkt->payloadDelay;
+                if (pkt->req->taskId() == context_switch_task_id::DMA &&
+                    pkt->req->substreamId() == 742) {
+                    // Apply zero latency, as SGA-DMA requests are not
+                    // supposed to pass through the cache
+                    completion_time = curTick();
+                } else {
+                    completion_time += clockEdge(responseLatency) +
+                        pkt->payloadDelay;
+                }
                 if (!is_error) {
                     if (pkt->isRead()) {
                         // sanity check

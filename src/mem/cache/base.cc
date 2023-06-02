@@ -57,6 +57,8 @@
 #include "debug/CacheRepl.hh"
 #include "debug/CacheVerbose.hh"
 #include "debug/HWPrefetch.hh"
+#include "dev/cat_common.hh"
+#include "dev/sga_dma_device.hh"
 #include "mem/cache/compressors/base.hh"
 #include "mem/cache/mshr.hh"
 #include "mem/cache/prefetch/base.hh"
@@ -670,8 +672,16 @@ BaseCache::recvTimingReq(PacketPtr pkt)
 void
 BaseCache::handleUncacheableWriteResp(PacketPtr pkt)
 {
-    Tick completion_time = clockEdge(responseLatency) +
-        pkt->headerDelay + pkt->payloadDelay;
+    Tick completion_time;
+    if (pkt->req->taskId() == context_switch_task_id::DMA &&
+        pkt->req->substreamId() == 742) {
+        // Apply zero latency, as SGA-DMA requests are not
+        // supposed to pass through the cache
+        completion_time = curTick();
+    } else {
+        completion_time = clockEdge(responseLatency) +
+            pkt->headerDelay + pkt->payloadDelay;
+    }
 
     // Reset the bus additional time as it is now accounted for
     pkt->headerDelay = pkt->payloadDelay = 0;
