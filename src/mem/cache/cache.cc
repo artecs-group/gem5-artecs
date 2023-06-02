@@ -190,17 +190,19 @@ Cache::access(PacketPtr pkt, CacheBlk *&blk, Cycles &lat,
             assert(lut_index != lut_end);
 
             // Flush and invalidate any existing block
+            bool evicted = false;
             for (auto i = lut_index; i != lut_end; i++) {
                 CacheBlk *old_blk(tags->findBlock(i->first,
                                                   pkt->isSecure()));
                 if (old_blk && old_blk->isValid()) {
                     BaseCache::evictBlock(old_blk, writebacks);
+                    evicted = true;
                 }
             }
 
-            // Apply zero latency, as these requests are not supposed to pass
-            // through the cache
-            lat = Cycles(0);
+            // If no eviction happened: apply zero latency, as these
+            // requests are not supposed to pass through the cache
+            lat = evicted ? lookupLatency : Cycles(0);
         } else {
             // flush and invalidate any existing block
             CacheBlk *old_blk(tags->findBlock(pkt->getAddr(),
