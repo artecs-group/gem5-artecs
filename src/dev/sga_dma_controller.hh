@@ -13,6 +13,10 @@
  * Table of commands: see cat_common.hh
  * Modifications:
  *
+ * 52     47   31           0
+ * +=======+====+===========+
+ * | 11110 | ND | ELEMS_LIM |
+ * +=======+====+===========+
  * 52     47   15           7              0
  * +=======+====+===========+==============+
  * | 11111 | ND | DIRECTION | START / STOP |
@@ -111,6 +115,9 @@ class SgaDmaController : public SgaDmaDevice
 
     /* Direction flag (true: scattering, false: gathering) */
     bool scattering;
+
+    /* Elements limit */
+    uint32_t elems_lim;
 
     /* Current parameters */
     params_t currentParams;

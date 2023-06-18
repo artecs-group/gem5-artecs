@@ -107,7 +107,7 @@ uint64_t getPayload(uint64_t req);
 bool setParams(uint64_t req, params_t &p, std::string &cmd_name);
 
 /* Generate an address LUT given the translation parameters. */
-void generateLut(params_t p, amap_t &lut);
+void generateLut(params_t p, amap_t &lut, uint32_t limit = 0);
 
 /* Align the address to word size for lut lookup */
 Addr lkAlign(Addr addr);

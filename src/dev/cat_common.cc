@@ -130,7 +130,7 @@ bool setParams(uint64_t req, params_t &p, std::string &cmd_name) {
     return success;
 }
 
-void generateLut(params_t p, amap_t &lut) {
+void generateLut(params_t p, amap_t &lut, uint32_t limit) {
     lut.clear();
 
     std::array<int16_t, 3> strides = { p.seq_stride,
@@ -166,16 +166,23 @@ void generateLut(params_t p, amap_t &lut) {
         break;
     }
     uint16_t ol_length = (p.ol_length < 1 ? 1 : p.ol_length);
+    uint32_t lut_entries = 0;
+    bool early_term = false;
 
     /* Create the LUT with every possible combination of addresses */
-    for (uint16_t ol_iter = 0; ol_iter < ol_length; ol_iter++) {
+    for (uint16_t ol_iter = 0; ol_iter < ol_length && !early_term; ol_iter++) {
         uint16_t elem = 0;
         // Inner loop
-        while (elem < length) {
+        while (elem < length && !early_term) {
             // Interleaving control
-            for (uint8_t i = 0; (i < intlv && elem++ < length); i++) {
+            for (uint8_t i = 0; i < intlv && elem++ < length && !early_term;
+                 i++) {
                 if (!lut.count(cur_addr[i])) {
                     lut[cur_addr[i]] = out_addr;
+                    lut_entries++;
+                    if (limit > 0 && lut_entries >= limit) {
+                        early_term = true;
+                    }
                     // Keep granularity fixed to 64 bits for now
                     out_addr += sizeof(uint64_t);
                 }
@@ -183,7 +190,7 @@ void generateLut(params_t p, amap_t &lut) {
             }
         }
         // End of inner loop, add outer loop offset
-        for (uint8_t i = 0; i < intlv; i++) {
+        for (uint8_t i = 0; i < intlv && !early_term; i++) {
             start_addr[i] = int64_t(start_addr[i]) + p.ol_offset;
         }
         cur_addr = start_addr;

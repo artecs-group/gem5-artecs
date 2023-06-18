@@ -19,7 +19,8 @@ SgaDmaController::SgaDmaController(const Params &params) :
     responseReg(0),
     statusReg(0),
     running(false),
-    scattering(false)
+    scattering(false),
+    elems_lim(0)
 {
     eocEvent = new EventFunctionWrapper([this]{ eocCallback(); }, name());
     eotEvent = new EventFunctionWrapper([this]{ eotCallback(); }, name());
@@ -211,6 +212,14 @@ SgaDmaController::regWrite(Addr addr, uint64_t data)
 
     if (!process_req) {
         // Nothing to do. Should never reach this point anyway.
+        return;
+    }
+
+    // Decode extra command: set elements limit
+    if (((data >> 48) & 0x1f) == 0b11110) {
+        DPRINTF(SgaDma, "Received command SGA_DMA_SET_ELEMS_LIM\n");
+        elems_lim = data & 0xffffffff;
+        setCmdResponse(true);
         return;
     }
 
