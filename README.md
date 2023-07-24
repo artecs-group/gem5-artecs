@@ -7,10 +7,18 @@ The features implemented on top of the official gem5 release are:
       - Adapted and improved from an unofficial patch by Xiangyu Dong (http://reviews.gem5.org/r/1809/)
    - Cache access trace generator
    - Miscellaneous modifications to configuration scripts
+   - Elements of the COMPAD architecture, described in:
+
+     > Marinelli, Tommaso and Gómez Pérez, José Ignacio and Tenllado, Christian and Catthoor, Francky, Compad: A Heterogeneous Cache-Scratchpad Cpu Architecture with Data Layout Compaction for Embedded Loop-Dominated Applications. Available at SSRN: https://ssrn.com/abstract=4519730 or http://dx.doi.org/10.2139/ssrn.4519730
 
 ## Acknowledgements
 
-This work has been supported by the EU (FEDER) and the Spanish MINECO and CM under grants S2018/TCS-4423 and RTI2018-093684-B-I00.
+This work has been supported by the EU (FEDER) and the Spanish MINECO / MICIN and CM under grants S2018/TCS-4423 and RTI2018-093684-B-I00 / PID2021-123041OB-I00.
+
+## External components
+- STL-like bidirectional map (``src/base/bimap.hh``)
+
+  > (C) 2002-2006 Joaquín M López Muñoz (joaquin@tid.es). All rights reserved.
 
 ## Original README
 
