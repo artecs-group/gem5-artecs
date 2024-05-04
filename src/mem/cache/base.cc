@@ -71,13 +71,15 @@
 #include "sim/stats.hh"
 
 /* Helper function to print binary values as hex */
-void printToHex(std::ofstream& stream, const void *data, size_t size) {
+void printToHex(std::ofstream& stream, const void *data, size_t size,
+                bool reverse = false) {
     stream << "0x";
     const uint8_t *buf = static_cast<const uint8_t *>(data);
     std::ios_base::fmtflags f(stream.flags());
+    stream << std::uppercase << std::hex;
     for (size_t i = 0; i < size; i++) {
-        stream << std::uppercase << std::hex << std::setfill('0')
-               << std::setw(2) << (static_cast<int>(buf[size-i-1]) & 0xFF);
+        stream << std::setfill('0') << std::setw(2)
+               << (static_cast<int>(buf[reverse ? size-i-1 : i]) & 0xFF);
     }
     stream.flags(f);
 }
@@ -640,7 +642,7 @@ BaseCache::recvTimingReq(PacketPtr pkt)
         if (data_access != None && dumpAccessTrace) {
             trace << curCycle() << ",";
             Addr pkt_addr = pkt->getAddr();
-            printToHex(trace, &pkt_addr, 8);
+            printToHex(trace, &pkt_addr, 8, true);
             trace << ",";
             if (pkt->isWrite()) {
                 printToHex(trace, pkt->getConstPtr<void>(), pkt->getSize());
@@ -814,7 +816,7 @@ BaseCache::recvTimingResp(PacketPtr pkt)
         if (!pkt->isUpgrade() && blk != tempBlock && dumpAccessTrace) {
             trace << curCycle() << ",";
             Addr pkt_addr = pkt->getAddr();
-            printToHex(trace, &pkt_addr, 8);
+            printToHex(trace, &pkt_addr, 8, true);
             trace << ",";
             printToHex(trace, pkt->getConstPtr<void>(), pkt->getSize());
             trace << ",W";
