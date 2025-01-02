@@ -9,7 +9,14 @@ The features implemented on top of the official gem5 release are:
    - Miscellaneous modifications to configuration scripts
    - Elements of the COMPAD architecture, described in:
 
-     > Marinelli, Tommaso and Gómez Pérez, José Ignacio and Tenllado, Christian and Catthoor, Francky, Compad: A Heterogeneous Cache-Scratchpad Cpu Architecture with Data Layout Compaction for Embedded Loop-Dominated Applications. Available at SSRN: https://ssrn.com/abstract=4519730 or http://dx.doi.org/10.2139/ssrn.4519730
+     > Tommaso Marinelli, José Ignacio Gómez Pérez, Christian Tenllado, Francky Catthoor,
+     > COMPAD: A heterogeneous cache-scratchpad CPU architecture with data layout compaction for embedded loop-dominated applications,
+     > Journal of Systems Architecture,
+     > Volume 145,
+     > 2023,
+     > 103022,
+     > ISSN 1383-7621,
+     > https://doi.org/10.1016/j.sysarc.2023.103022.
 
 ## Acknowledgements
 
